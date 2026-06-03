@@ -1,0 +1,62 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  body {
+    font-family: 'DM Sans', system-ui, sans-serif;
+    background-color: #f4f6f9;
+    color: #1e293b;
+    -webkit-font-smoothing: antialiased;
+    position: relative;
+  }
+
+  /* Liquid gradient orb background effect */
+  body::before {
+    content: '';
+    position: fixed;
+    inset: 0;
+    pointer-events: none;
+    z-index: 0;
+    background:
+      radial-gradient(ellipse 1000px 800px at 5% -10%, rgba(33, 55, 97, 0.07) 0%, transparent 65%),
+      radial-gradient(ellipse 700px 700px at 95% 85%, rgba(51, 116, 181, 0.06) 0%, transparent 65%),
+      radial-gradient(ellipse 500px 500px at 75% 15%, rgba(227, 30, 36, 0.04) 0%, transparent 60%);
+  }
+
+  /* All content must sit above the background orbs */
+  #root {
+    position: relative;
+    z-index: 1;
+  }
+
+  ::-webkit-scrollbar {
+    width: 6px;
+    height: 6px;
+  }
+  ::-webkit-scrollbar-track {
+    background: #eef2f7;
+  }
+  ::-webkit-scrollbar-thumb {
+    background: #c1cede;
+    border-radius: 3px;
+  }
+  ::-webkit-scrollbar-thumb:hover {
+    background: #3374B5;
+  }
+}
+
+@layer utilities {
+  .glass {
+    background: rgba(255, 255, 255, 0.75);
+    backdrop-filter: blur(16px);
+    -webkit-backdrop-filter: blur(16px);
+  }
+  .glass-card {
+    background: rgba(255, 255, 255, 0.85);
+    backdrop-filter: blur(8px);
+    -webkit-backdrop-filter: blur(8px);
+    border: 1px solid rgba(221, 227, 236, 0.8);
+    box-shadow: 0 1px 3px rgba(33, 55, 97, 0.06), 0 4px 16px rgba(33, 55, 97, 0.04);
+  }
+}

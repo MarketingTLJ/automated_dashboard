@@ -1,0 +1,17 @@
+# Dados sensíveis — nunca versionar
+Reports/
+
+# Dependências
+node_modules/
+
+# Build
+dist/
+
+# Cache e logs
+.DS_Store
+*.log
+npm-debug.log*
+
+# Variáveis de ambiente
+.env
+.env.local

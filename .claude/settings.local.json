@@ -1,0 +1,10 @@
+{
+  "permissions": {
+    "allow": [
+      "PowerShell(Get-Command winget -ErrorAction SilentlyContinue)",
+      "PowerShell(if \\(-not $?\\) { \"git nao encontrado\" })",
+      "PowerShell($env:PATH = \"$env:PATH;C:\\\\Program Files\\\\Git\\\\cmd\"; cd \"c:\\\\Users\\\\bmath\\\\OneDrive\\\\Área de Trabalho\\\\ClaudeProjects\\\\Automated_Reports\"; git init; git config user.name \"Marketing TLJ\"; git config user.email \"marketing@tlj.net.br\")",
+      "PowerShell($env:PATH = \"$env:PATH;C:\\\\Program Files\\\\Git\\\\cmd\"; cd \"c:\\\\Users\\\\bmath\\\\OneDrive\\\\Área de Trabalho\\\\ClaudeProjects\\\\Automated_Reports\"; git add .; git status --short | Select-Object -First 30)"
+    ]
+  }
+}
