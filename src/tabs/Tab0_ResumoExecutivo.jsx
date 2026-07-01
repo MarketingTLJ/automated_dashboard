@@ -2,12 +2,14 @@ import { DeltaBadge } from '../components/ui/DeltaBadge.jsx';
 import { AlertBanner } from '../components/ui/AlertBanner.jsx';
 import { RevenueStackedBar } from '../components/charts/RevenueStackedBar.jsx';
 import { ConversionRateBar } from '../components/charts/ConversionRateBar.jsx';
+import { RevenueInvestmentTrend } from '../components/charts/RevenueInvestmentTrend.jsx';
 import { fmt, scl } from '../utils/formatters.js';
 import { generateAlerts } from '../utils/alertEngine.js';
 import { THR } from '../constants/index.js';
 
 export function Tab0_ResumoExecutivo({
-  CURR, PREV, trend, N, filtered, filteredTermino, isRange,
+  CURR, PREV, trend6, N6, investRevenueVendas, investRevenueVendasInc,
+  filtered, filteredTermino, isRange,
   periodStart, periodEnd, taxaGeralCurr, taxaGeralPrev,
 }) {
   if (!CURR) return null;
@@ -196,14 +198,30 @@ export function Tab0_ResumoExecutivo({
           <p className="text-gray-700 text-xs uppercase tracking-widest font-semibold mb-4">
             Receita — Vendas + Incrementos + Renovações
           </p>
-          <RevenueStackedBar data={trend} N={N} height={200} />
+          <RevenueStackedBar data={trend6} N={N6} height={200} />
         </div>
         <div className="glass-card rounded-2xl p-5">
           <p className="text-gray-700 text-xs uppercase tracking-widest font-semibold mb-1">
             Taxa de Conversão Geral (%)
           </p>
           <p className="text-gray-600 text-xs mb-4">Vendas ÷ Total Leads gerados no mês</p>
-          <ConversionRateBar data={trend} N={N} height={180} />
+          <ConversionRateBar data={trend6} N={N6} height={180} />
+        </div>
+      </div>
+
+      {/* Investimento x Faturamento x Lucro — últimos 6 meses, todas as fontes */}
+      <div className="grid grid-cols-1 gap-5 mt-5">
+        <div className="glass-card rounded-2xl p-5">
+          <p className="text-gray-700 text-xs uppercase tracking-widest font-semibold mb-4">
+            Novas Vendas — Todas as Fontes · Últimos 6 Meses
+          </p>
+          <RevenueInvestmentTrend data={investRevenueVendas} />
+        </div>
+        <div className="glass-card rounded-2xl p-5">
+          <p className="text-gray-700 text-xs uppercase tracking-widest font-semibold mb-4">
+            Novas Vendas + Incrementos — Todas as Fontes · Últimos 6 Meses
+          </p>
+          <RevenueInvestmentTrend data={investRevenueVendasInc} />
         </div>
       </div>
     </div>

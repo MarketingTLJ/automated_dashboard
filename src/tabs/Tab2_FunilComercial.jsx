@@ -12,7 +12,7 @@ const STAGES = [
   { key: 'vendas', label: '4. Vendas Fechadas',   color: '#22c55e', icon: '✅', note: 'Contratos assinados' },
 ];
 
-export function Tab2_FunilComercial({ CURR, PREV, trend, N, filtered, isRange }) {
+export function Tab2_FunilComercial({ CURR, PREV, trend6, N6, filtered, isRange }) {
   if (!CURR) return null;
 
   const taxaGeral = CURR.leads_total > 0 ? +((CURR.qtd_v / CURR.leads_total) * 100).toFixed(1) : 0;
@@ -102,11 +102,11 @@ export function Tab2_FunilComercial({ CURR, PREV, trend, N, filtered, isRange })
       <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
         <div className="glass-card rounded-2xl p-5">
           <p className="text-gray-700 text-xs uppercase tracking-widest font-semibold mb-4">Leads e Reuniões — Período</p>
-          <FunnelBars data={trend} N={N} />
+          <FunnelBars data={trend6} N={N6} />
         </div>
         <div className="glass-card rounded-2xl p-5">
           <p className="text-gray-700 text-xs uppercase tracking-widest font-semibold mb-4">Ganhos vs Perdidos — Closer</p>
-          <WinLossBar data={trend} N={N} />
+          <WinLossBar data={trend6} N={N6} />
         </div>
       </div>
     </div>

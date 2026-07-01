@@ -63,6 +63,49 @@ function mergePP(arr) {
   return r;
 }
 
+// Maps an array of month records into the flat shape used by trend charts
+function buildTrend(arr) {
+  return arr.map(d => ({
+    mes:        d.label,
+    vendas:     d.rec_v,
+    inc:        d.rec_i,
+    ren:        d.rec_r,
+    leads:      d.leads_total,
+    reunioes:   d.reunioes,
+    ganho:      d.ganho,
+    perdido:    d.perdido,
+    taxa_fech:  d.taxa_fech,
+    taxa_geral: d.leads_total > 0 ? +((d.qtd_v / d.leads_total) * 100).toFixed(1) : 0,
+    inv:        d.inv,
+    roi:        d.roi,
+    cpl:        d.cpl,
+    ticket:     d.ticket,
+    total_rec:  d.rec_v + d.rec_i + d.rec_r,
+    pp:         d.pp,
+  }));
+}
+
+// Fixed last-6-months slice of DATA — independent of the date filters,
+// used by charts that must always show a trailing 6-month trend (§ CLAUDE.md request).
+const LAST6_RAW = DATA.slice(-6);
+
+// Builds the Investimento/Faturamento/Lucro Bruto + Leads/Vendas/Taxa/ROI/CAC
+// series for the fixed Resumo Executivo / Investimentos comparison charts.
+// withIncrementos=false → Novas Vendas only. withIncrementos=true → Novas Vendas + Incrementos.
+// Fixed to the last 6 months (ignores date filters) — honors the fonte filter.
+function buildInvestRevenue(arr, withIncrementos) {
+  return arr.map(d => {
+    const faturamento = withIncrementos ? d.rec_v + d.rec_i : d.rec_v;
+    const qtd = withIncrementos ? d.qtd_v + d.qtd_i : d.qtd_v;
+    const inv = d.inv;
+    const lucro = +(faturamento - inv).toFixed(2);
+    const roi = inv > 0 ? +((faturamento - inv) / inv).toFixed(2) : 0;
+    const cac = qtd > 0 ? +(inv / qtd).toFixed(2) : 0;
+    const taxa = d.leads_total > 0 ? +((qtd / d.leads_total) * 100).toFixed(1) : 0;
+    return { mes: d.label, inv, faturamento, lucro, roi, cac, taxa, leads: d.leads_total, qtd };
+  });
+}
+
 // ── Fonte filter helpers ────────────────────────────────────────────────────
 
 // Expand '__pagas__' sentinel to individual paid fonte names
@@ -302,28 +345,21 @@ export function useDerivedData(criadoStart, criadoEnd, terminoStart, terminoEnd,
   const N    = filteredF.length - 1;
 
   // ── Trend uses filtered with fonte applied ───────────────────────────────
-  const trend = useMemo(
-    () =>
-      filteredF.map(d => ({
-        mes:        d.label,
-        vendas:     d.rec_v,
-        inc:        d.rec_i,
-        ren:        d.rec_r,
-        leads:      d.leads_total,
-        reunioes:   d.reunioes,
-        ganho:      d.ganho,
-        perdido:    d.perdido,
-        taxa_fech:  d.taxa_fech,
-        taxa_geral: d.leads_total > 0 ? +((d.qtd_v / d.leads_total) * 100).toFixed(1) : 0,
-        inv:        d.inv,
-        roi:        d.roi,
-        cpl:        d.cpl,
-        ticket:     d.ticket,
-        total_rec:  d.rec_v + d.rec_i + d.rec_r,
-        pp:         d.pp,
-      })),
-    [filteredF]
+  const trend = useMemo(() => buildTrend(filteredF), [filteredF]);
+
+  // ── Fixed last-6-months trend — ignores date filters, still honors fonte ──
+  const last6F = useMemo(
+    () => expandedFontes.length
+      ? LAST6_RAW.map(d => applyFonteFilter(d, expandedFontes))
+      : LAST6_RAW,
+    [expandedFontes]
   );
+  const trend6 = useMemo(() => buildTrend(last6F), [last6F]);
+  const N6 = last6F.length - 1;
+
+  // ── Investimento x Faturamento x Lucro — últimos 6 meses, honors fonte filter ──
+  const investRevenueVendas = useMemo(() => buildInvestRevenue(last6F, false), [last6F]);
+  const investRevenueVendasInc = useMemo(() => buildInvestRevenue(last6F, true), [last6F]);
 
   const taxaGeralCurr = CURR && CURR.leads_total > 0
     ? +((CURR.qtd_v / CURR.leads_total) * 100).toFixed(1) : 0;
@@ -336,6 +372,9 @@ export function useDerivedData(criadoStart, criadoEnd, terminoStart, terminoEnd,
     // filteredF/filteredTerminoF expose the fonte-filtered arrays to tabs
     filtered: filteredF, filteredTermino: filteredTerminoF,
     CURR, PREV, N, trend,
+    // Fixed last-6-months series — ignores date filters (honors fonte filter)
+    trend6, N6, last6: last6F,
+    investRevenueVendas, investRevenueVendasInc,
     taxaGeralCurr, taxaGeralPrev, allMonths, isRange,
     allFontes,
   };

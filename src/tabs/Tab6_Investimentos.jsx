@@ -1,10 +1,13 @@
 ﻿import { SectionHeader } from '../components/ui/SectionHeader.jsx';
 import { KpiCard } from '../components/ui/KpiCard.jsx';
 import { RoiCplComposed } from '../components/charts/RoiCplComposed.jsx';
+import { RevenueInvestmentTrend } from '../components/charts/RevenueInvestmentTrend.jsx';
 import { fmt, fmtK, sclCls } from '../utils/formatters.js';
 import { COLORS } from '../constants/index.js';
 
-export function Tab6_Investimentos({ CURR, PREV, trend, N, filtered, isRange }) {
+export function Tab6_Investimentos({
+  CURR, PREV, trend6, N6, last6, investRevenueVendas, investRevenueVendasInc, isRange,
+}) {
   if (!CURR) return null;
 
   return (
@@ -78,8 +81,8 @@ export function Tab6_Investimentos({ CURR, PREV, trend, N, filtered, isRange }) 
 
       {/* ROI + CPL chart */}
       <div className="glass-card rounded-2xl p-5 mb-5">
-        <p className="text-gray-700 text-xs uppercase tracking-widest font-semibold mb-4">ROI e CPL — Período Selecionado</p>
-        <RoiCplComposed data={trend} N={N} />
+        <p className="text-gray-700 text-xs uppercase tracking-widest font-semibold mb-4">ROI e CPL — Últimos 6 Meses</p>
+        <RoiCplComposed data={trend6} N={N6} />
       </div>
 
       {/* Table */}
@@ -99,15 +102,15 @@ export function Tab6_Investimentos({ CURR, PREV, trend, N, filtered, isRange }) 
             </tr>
           </thead>
           <tbody>
-            {filtered.map((d, i) => (
+            {last6.map((d, i) => (
               <tr
                 key={d.ym}
                 className={`border-b border-gray-100 hover:bg-gray-50 ${
-                  i === filtered.length - 1 ? 'bg-brand-blue/10' : ''
+                  i === last6.length - 1 ? 'bg-brand-blue/10' : ''
                 }`}
               >
-                <td className={`p-4 font-bold ${i === filtered.length - 1 ? 'text-brand-blue-light' : 'text-gray-600'}`}>
-                  {d.label}{i === filtered.length - 1 ? ' ★' : ''}
+                <td className={`p-4 font-bold ${i === last6.length - 1 ? 'text-brand-blue-light' : 'text-gray-600'}`}>
+                  {d.label}{i === last6.length - 1 ? ' ★' : ''}
                 </td>
                 <td className="p-4 text-right text-brand-blue-light font-mono">{fmt(d.inv)}</td>
                 <td className="p-4 text-right text-gray-600">{d.leads_total}</td>
@@ -122,6 +125,22 @@ export function Tab6_Investimentos({ CURR, PREV, trend, N, filtered, isRange }) 
             ))}
           </tbody>
         </table>
+      </div>
+
+      {/* Investimento x Faturamento x Lucro — últimos 6 meses, todas as fontes */}
+      <div className="grid grid-cols-1 gap-5 mt-5">
+        <div className="glass-card rounded-2xl p-5">
+          <p className="text-gray-700 text-xs uppercase tracking-widest font-semibold mb-4">
+            Novas Vendas — Todas as Fontes · Últimos 6 Meses
+          </p>
+          <RevenueInvestmentTrend data={investRevenueVendas} />
+        </div>
+        <div className="glass-card rounded-2xl p-5">
+          <p className="text-gray-700 text-xs uppercase tracking-widest font-semibold mb-4">
+            Novas Vendas + Incrementos — Todas as Fontes · Últimos 6 Meses
+          </p>
+          <RevenueInvestmentTrend data={investRevenueVendasInc} />
+        </div>
       </div>
     </div>
   );

@@ -6,7 +6,7 @@ import { ChartTooltip } from '../components/ui/ChartTooltip.jsx';
 import { fmt, fmtK } from '../utils/formatters.js';
 import { COLORS, CHART_OPACITY } from '../constants/index.js';
 
-export function Tab5_PropostasPerdidas({ CURR, trend, N, filtered, isRange }) {
+export function Tab5_PropostasPerdidas({ CURR, trend6, N6, filtered, isRange }) {
   const [sel, setSel] = useState(null);
   if (!CURR) return null;
 
@@ -15,8 +15,8 @@ export function Tab5_PropostasPerdidas({ CURR, trend, N, filtered, isRange }) {
     .map(([nome, d]) => ({ nome, ...d }))
     .sort((a, b) => b.total - a.total);
 
-  // PP evolution trend
-  const ppTrend = trend.map(d => ({
+  // PP evolution trend — fixed last 6 months, ignores date filters
+  const ppTrend = trend6.map(d => ({
     mes:    d.mes,
     perdas: d.pp?.total  ?? 0,
     valor:  d.pp?.valor  ?? 0,
@@ -57,7 +57,7 @@ export function Tab5_PropostasPerdidas({ CURR, trend, N, filtered, isRange }) {
 
       {/* PP trend */}
       <div className="glass-card rounded-2xl p-5 mb-5">
-        <p className="text-gray-700 text-xs uppercase tracking-widest font-semibold mb-4">Evolução de Perdas — Período Selecionado</p>
+        <p className="text-gray-700 text-xs uppercase tracking-widest font-semibold mb-4">Evolução de Perdas — Últimos 6 Meses</p>
         <ResponsiveContainer width="100%" height={180}>
           <BarChart data={ppTrend}>
             <CartesianGrid strokeDasharray="3 3" stroke="#e5e7eb" />
@@ -65,7 +65,7 @@ export function Tab5_PropostasPerdidas({ CURR, trend, N, filtered, isRange }) {
             <YAxis tick={{ fill: '#6b7280', fontSize: 10 }} axisLine={false} tickLine={false} />
             <Tooltip content={<ChartTooltip />} />
             <Bar dataKey="perdas" name="Negócios Perdidos" radius={[3, 3, 0, 0]}>
-              {ppTrend.map((_, i) => <Cell key={i} fill={COLORS.brandRed} opacity={i === N ? CHART_OPACITY.active : CHART_OPACITY.past} />)}
+              {ppTrend.map((_, i) => <Cell key={i} fill={COLORS.brandRed} opacity={i === N6 ? CHART_OPACITY.active : CHART_OPACITY.past} />)}
             </Bar>
           </BarChart>
         </ResponsiveContainer>

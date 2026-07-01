@@ -6,7 +6,7 @@ import { ChartTooltip } from '../components/ui/ChartTooltip.jsx';
 import { fmt, fmtK } from '../utils/formatters.js';
 import { COLORS, CHART_OPACITY } from '../constants/index.js';
 
-export function Tab1_Receita({ CURR, PREV, trend, N, filtered, isRange }) {
+export function Tab1_Receita({ CURR, PREV, trend, trend6, N6, filtered, isRange }) {
   if (!CURR) return null;
   const totalRec  = CURR.rec_v + CURR.rec_i + CURR.rec_r;
   const prevTotal = PREV ? PREV.rec_v + PREV.rec_i + PREV.rec_r : undefined;
@@ -96,13 +96,13 @@ export function Tab1_Receita({ CURR, PREV, trend, N, filtered, isRange }) {
           <p className="text-gray-700 text-xs uppercase tracking-widest font-semibold mb-1">Incrementos por Mês</p>
           <p className="text-emerald-400 text-xs font-bold mb-4">{isRange ? 'Período' : CURR.label}: {fmt(CURR.rec_i)} · {CURR.qtd_i} registros</p>
           <ResponsiveContainer width="100%" height={180}>
-            <BarChart data={trend}>
+            <BarChart data={trend6}>
               <CartesianGrid strokeDasharray="3 3" stroke="#e5e7eb" />
               <XAxis dataKey="mes" tick={{ fill: '#6b7280', fontSize: 10 }} axisLine={false} tickLine={false} />
               <YAxis tickFormatter={fmtK} tick={{ fill: '#6b7280', fontSize: 10 }} axisLine={false} tickLine={false} />
               <Tooltip content={<ChartTooltip currency />} />
               <Bar dataKey="inc" name="Incrementos" radius={[4, 4, 0, 0]}>
-                {trend.map((_, i) => <Cell key={i} fill={COLORS.incrementos} opacity={i === N ? CHART_OPACITY.active : CHART_OPACITY.past} />)}
+                {trend6.map((_, i) => <Cell key={i} fill={COLORS.incrementos} opacity={i === N6 ? CHART_OPACITY.active : CHART_OPACITY.past} />)}
               </Bar>
             </BarChart>
           </ResponsiveContainer>
@@ -111,8 +111,8 @@ export function Tab1_Receita({ CURR, PREV, trend, N, filtered, isRange }) {
 
       {/* Full stacked */}
       <div className="glass-card rounded-2xl p-5">
-        <p className="text-gray-700 text-xs uppercase tracking-widest font-semibold mb-4">Evolução de Receita — Período Selecionado</p>
-        <RevenueStackedBar data={trend} N={N} height={280} />
+        <p className="text-gray-700 text-xs uppercase tracking-widest font-semibold mb-4">Evolução de Receita — Últimos 6 Meses</p>
+        <RevenueStackedBar data={trend6} N={N6} height={280} />
       </div>
     </div>
   );

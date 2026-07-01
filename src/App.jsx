@@ -30,10 +30,17 @@ export default function App() {
   // Fonte filter — default: all sources (empty = no filter)
   const [fonteFilter, setFonteFilter] = useState([]);
 
-  const { filtered, filteredTermino, CURR, PREV, N, trend, taxaGeralCurr, taxaGeralPrev, allMonths, isRange, allFontes } =
-    useDerivedData(criadoStart, criadoEnd, terminoStart, terminoEnd, fonteFilter);
+  const {
+    filtered, filteredTermino, CURR, PREV, N, trend, trend6, N6, last6,
+    investRevenueVendas, investRevenueVendasInc,
+    taxaGeralCurr, taxaGeralPrev, allMonths, isRange, allFontes,
+  } = useDerivedData(criadoStart, criadoEnd, terminoStart, terminoEnd, fonteFilter);
 
-  const tabProps = { CURR, PREV, trend, N, filtered, filteredTermino, isRange };
+  const tabProps = {
+    CURR, PREV, trend, N, trend6, N6, last6,
+    investRevenueVendas, investRevenueVendasInc,
+    filtered, filteredTermino, isRange,
+  };
 
   return (
     <div className="min-h-screen" style={{ fontFamily: "'DM Sans', system-ui, sans-serif" }}>
