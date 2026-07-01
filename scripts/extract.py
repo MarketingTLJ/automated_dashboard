@@ -25,10 +25,10 @@ ROOT    = Path(__file__).parent.parent
 REPORTS = ROOT / "Reports"
 OUTPUT  = ROOT / "src" / "data" / "data.js"
 
-FILE_CLOSER       = REPORTS / "BASE CLOSER - MODIFICADO 2025 a 01.06.25.xlsx"
-FILE_SDR          = REPORTS / "BASE SDR - MODIFICADO 2025 a 01.06.25.xlsx"
-FILE_RENT         = REPORTS / "BASE RENTABILIZAÇÂO COMPLETA - 01.06.2026.xlsx"
-FILE_LC           = REPORTS / "BASE LICENCAS TODA - 02.06.2026.xlsx"
+FILE_CLOSER       = REPORTS / "BASE CLOSER - MODIFICADO 2025 a 01.07.25.xlsx"
+FILE_SDR          = REPORTS / "BASE SDR - MODIFICADO 2025 a 01.07.2026.xlsx"
+FILE_RENT         = REPORTS / "BASE RENTABILIZAÇÂO COMPLETA - 01.07.2026.xlsx"
+FILE_LC           = REPORTS / "BASE LICENCAS TODA - 01.07.2026.xlsx"
 FILE_INV          = REPORTS / "INVESTIMENTOS.xlsx"
 FILE_FONTES_PAGAS = REPORTS / "FontesPagas.xlsx"
 
@@ -126,7 +126,7 @@ def _vlookup_fonte(df, closer, label=''):
     """VLOOKUP: df.Empresa → Closer.Empresa → Closer.Fonte. Mutates df in-place."""
     if 'Empresa' in closer.columns and 'Fonte' in closer.columns and 'Empresa' in df.columns:
         empresa_fonte = {}
-        for fase in ['Ganho', None]:
+        for fase in ['Venda - Ganho', None]:
             subset = closer[closer['Fase'] == fase] if fase else closer
             for _, row in subset[['Empresa', 'Fonte']].dropna().iterrows():
                 emp = str(row['Empresa']).strip()
@@ -314,7 +314,7 @@ def build_month(ym, label, sdr, closer, rent, lics, inv_map, inv_breakdown):
     ls, lc = len(s), len(c)
 
     # ─── PIPELINE HEALTH (por criação, para taxa_fech e análise de funil) ─────
-    ganho   = _safe_int((c['Fase']=='Ganho').sum())
+    ganho   = _safe_int((c['Fase']=='Venda - Ganho').sum())
     perdido = _safe_int((c['Fase']=='Perdido').sum())
     aberto  = lc - ganho - perdido
     taxa_fech = round(ganho/(ganho+perdido)*100, 1) if ganho+perdido > 0 else 0.0
@@ -323,7 +323,7 @@ def build_month(ym, label, sdr, closer, rent, lics, inv_map, inv_breakdown):
     c_fechado = closer[
         (closer['dt_fech'].dt.year==y) &
         (closer['dt_fech'].dt.month==m) &
-        (closer['Fase']=='Ganho')
+        (closer['Fase']=='Venda - Ganho')
     ]
     rec_v  = float(round(c_fechado['Renda'].sum(), 2))
     qtd_v  = len(c_fechado)
@@ -365,7 +365,7 @@ def build_month(ym, label, sdr, closer, rent, lics, inv_map, inv_breakdown):
     closer_resp = {}
     for nome in sorted(c['Responsável'].dropna().unique()):
         sub_c = c[c['Responsável']==nome]
-        g = _safe_int((sub_c['Fase']=='Ganho').sum())
+        g = _safe_int((sub_c['Fase']=='Venda - Ganho').sum())
         p = _safe_int((sub_c['Fase']=='Perdido').sum())
         closer_resp[nome] = {
             'total': len(sub_c), 'ganho': g,
@@ -387,7 +387,7 @@ def build_month(ym, label, sdr, closer, rent, lics, inv_map, inv_breakdown):
         if nome == '' or nome != nome:
             continue
         sub_fc = c[c['#TLJ# SDR']==nome]
-        g2 = _safe_int((sub_fc['Fase']=='Ganho').sum())
+        g2 = _safe_int((sub_fc['Fase']=='Venda - Ganho').sum())
         p2 = _safe_int((sub_fc['Fase']=='Perdido').sum())
         sdr_to_closer[str(nome)] = {
             'total': len(sub_fc), 'ganho': g2,
@@ -396,7 +396,7 @@ def build_month(ym, label, sdr, closer, rent, lics, inv_map, inv_breakdown):
     # Unattributed (no SDR)
     no_sdr = c[c['#TLJ# SDR'].isna() | (c['#TLJ# SDR']=='')]
     if len(no_sdr) > 0:
-        g3 = _safe_int((no_sdr['Fase']=='Ganho').sum())
+        g3 = _safe_int((no_sdr['Fase']=='Venda - Ganho').sum())
         p3 = _safe_int((no_sdr['Fase']=='Perdido').sum())
         sdr_to_closer['Não atrib.'] = {
             'total': len(no_sdr), 'ganho': g3,
@@ -485,7 +485,7 @@ def build_month_termino(ym, label, sdr, closer, rent, lics, inv_map, inv_breakdo
     y, m = int(ym[:4]), int(ym[5:])
 
     # Closer deals CLOSED this month
-    c_ganho   = closer[(closer['dt_fech'].dt.year==y) & (closer['dt_fech'].dt.month==m) & (closer['Fase']=='Ganho')]
+    c_ganho   = closer[(closer['dt_fech'].dt.year==y) & (closer['dt_fech'].dt.month==m) & (closer['Fase']=='Venda - Ganho')]
     c_perdido = closer[(closer['dt_fech'].dt.year==y) & (closer['dt_fech'].dt.month==m) & (closer['Fase']=='Perdido')]
     c_all     = closer[(closer['dt_fech'].dt.year==y) & (closer['dt_fech'].dt.month==m)]
 
@@ -528,7 +528,7 @@ def build_month_termino(ym, label, sdr, closer, rent, lics, inv_map, inv_breakdo
     closer_resp = {}
     for nome in sorted(c_all['Responsável'].dropna().unique()):
         sub_c = c_all[c_all['Responsável']==nome]
-        g = _safe_int((sub_c['Fase']=='Ganho').sum())
+        g = _safe_int((sub_c['Fase']=='Venda - Ganho').sum())
         p = _safe_int((sub_c['Fase']=='Perdido').sum())
         closer_resp[nome] = {'total': len(sub_c), 'ganho': g, 'perdido': p, 'aberto': len(sub_c)-g-p}
 
