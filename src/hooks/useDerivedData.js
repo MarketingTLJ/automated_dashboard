@@ -102,7 +102,8 @@ function buildInvestRevenue(arr, withIncrementos) {
     const roi = inv > 0 ? +((faturamento - inv) / inv).toFixed(2) : 0;
     const cac = qtd > 0 ? +(inv / qtd).toFixed(2) : 0;
     const taxa = d.leads_total > 0 ? +((qtd / d.leads_total) * 100).toFixed(1) : 0;
-    return { mes: d.label, inv, faturamento, lucro, roi, cac, taxa, leads: d.leads_total, qtd };
+    // reunioes = leads_closer (regra de negócio) — usa o campo já filtrado por fonte
+    return { mes: d.label, inv, faturamento, lucro, roi, cac, taxa, leads: d.leads_total, reunioes: d.leads_closer, qtd };
   });
 }
 

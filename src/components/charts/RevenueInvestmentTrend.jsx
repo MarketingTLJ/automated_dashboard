@@ -4,8 +4,9 @@ import { fmt, fmtK } from '../../utils/formatters.js';
 import { COLORS } from '../../constants/index.js';
 
 const METRIC_ROWS = [
-  { key: 'leads', label: 'Leads',         fmt: v => v },
-  { key: 'qtd',   label: 'Vendas',        fmt: v => v },
+  { key: 'leads',    label: 'Leads',              fmt: v => v },
+  { key: 'reunioes', label: 'Volume de Reuniões', fmt: v => v },
+  { key: 'qtd',      label: 'Vendas',             fmt: v => v },
   { key: 'taxa',  label: 'Tx. Conversão', fmt: v => `${v}%` },
   { key: 'roi',   label: 'ROI',           fmt: v => `${v}x` },
   { key: 'cac',   label: 'CAC',           fmt: v => fmt(v) },
