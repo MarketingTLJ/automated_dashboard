@@ -89,6 +89,14 @@ function buildTrend(arr) {
 // used by charts that must always show a trailing 6-month trend (§ CLAUDE.md request).
 const LAST6_RAW = DATA.slice(-6);
 
+// Same calendar months as LAST6_RAW, one year earlier (e.g. Jan-Jun/26 → Jan-Jun/25).
+// Missing months (no data that far back) are simply omitted.
+const DATA_BY_YM = new Map(DATA.map(d => [d.ym, d]));
+const ymPrevYear = ym => `${+ym.slice(0, 4) - 1}${ym.slice(4)}`;
+const LAST6_PREV_YEAR_RAW = LAST6_RAW
+  .map(d => DATA_BY_YM.get(ymPrevYear(d.ym)))
+  .filter(Boolean);
+
 // Builds the Investimento/Faturamento/Lucro Bruto + Leads/Vendas/Taxa/ROI/CAC
 // series for the fixed Resumo Executivo / Investimentos comparison charts.
 // withIncrementos=false → Novas Vendas only. withIncrementos=true → Novas Vendas + Incrementos.
@@ -362,6 +370,20 @@ export function useDerivedData(criadoStart, criadoEnd, terminoStart, terminoEnd,
   const investRevenueVendas = useMemo(() => buildInvestRevenue(last6F, false), [last6F]);
   const investRevenueVendasInc = useMemo(() => buildInvestRevenue(last6F, true), [last6F]);
 
+  // ── Mesmos 6 meses, ano anterior — mesmo tratamento de fonte ──────────────
+  const last6PrevYearF = useMemo(
+    () => expandedFontes.length
+      ? LAST6_PREV_YEAR_RAW.map(d => applyFonteFilter(d, expandedFontes))
+      : LAST6_PREV_YEAR_RAW,
+    [expandedFontes]
+  );
+  const investRevenueVendasPrevYear = useMemo(
+    () => buildInvestRevenue(last6PrevYearF, false), [last6PrevYearF]
+  );
+  const investRevenueVendasIncPrevYear = useMemo(
+    () => buildInvestRevenue(last6PrevYearF, true), [last6PrevYearF]
+  );
+
   const taxaGeralCurr = CURR && CURR.leads_total > 0
     ? +((CURR.qtd_v / CURR.leads_total) * 100).toFixed(1) : 0;
   const taxaGeralPrev = PREV && PREV.leads_total > 0
@@ -376,6 +398,7 @@ export function useDerivedData(criadoStart, criadoEnd, terminoStart, terminoEnd,
     // Fixed last-6-months series — ignores date filters (honors fonte filter)
     trend6, N6, last6: last6F,
     investRevenueVendas, investRevenueVendasInc,
+    investRevenueVendasPrevYear, investRevenueVendasIncPrevYear,
     taxaGeralCurr, taxaGeralPrev, allMonths, isRange,
     allFontes,
   };

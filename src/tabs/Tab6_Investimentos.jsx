@@ -6,7 +6,10 @@ import { fmt, fmtK, sclCls } from '../utils/formatters.js';
 import { COLORS } from '../constants/index.js';
 
 export function Tab6_Investimentos({
-  CURR, PREV, trend6, N6, last6, investRevenueVendas, investRevenueVendasInc, isRange,
+  CURR, PREV, trend6, N6, last6,
+  investRevenueVendas, investRevenueVendasInc,
+  investRevenueVendasPrevYear, investRevenueVendasIncPrevYear,
+  isRange,
 }) {
   if (!CURR) return null;
 
@@ -131,15 +134,27 @@ export function Tab6_Investimentos({
       <div className="grid grid-cols-1 gap-5 mt-5">
         <div className="glass-card rounded-2xl p-5">
           <p className="text-gray-700 text-xs uppercase tracking-widest font-semibold mb-4">
-            Novas Vendas — Todas as Fontes · Últimos 6 Meses
+            Novas Vendas — Todas as Fontes · Últimos 6 Meses (2026)
           </p>
           <RevenueInvestmentTrend data={investRevenueVendas} />
         </div>
         <div className="glass-card rounded-2xl p-5">
           <p className="text-gray-700 text-xs uppercase tracking-widest font-semibold mb-4">
-            Novas Vendas + Incrementos — Todas as Fontes · Últimos 6 Meses
+            Novas Vendas — Todas as Fontes · 6 Meses Atuais (2025)
+          </p>
+          <RevenueInvestmentTrend data={investRevenueVendasPrevYear} />
+        </div>
+        <div className="glass-card rounded-2xl p-5">
+          <p className="text-gray-700 text-xs uppercase tracking-widest font-semibold mb-4">
+            Novas Vendas + Incrementos — Todas as Fontes · Últimos 6 Meses (2026)
           </p>
           <RevenueInvestmentTrend data={investRevenueVendasInc} />
+        </div>
+        <div className="glass-card rounded-2xl p-5">
+          <p className="text-gray-700 text-xs uppercase tracking-widest font-semibold mb-4">
+            Novas Vendas + Incrementos — Todas as Fontes · 6 Meses Atuais (2025)
+          </p>
+          <RevenueInvestmentTrend data={investRevenueVendasIncPrevYear} />
         </div>
       </div>
     </div>

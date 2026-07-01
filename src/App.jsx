@@ -33,12 +33,14 @@ export default function App() {
   const {
     filtered, filteredTermino, CURR, PREV, N, trend, trend6, N6, last6,
     investRevenueVendas, investRevenueVendasInc,
+    investRevenueVendasPrevYear, investRevenueVendasIncPrevYear,
     taxaGeralCurr, taxaGeralPrev, allMonths, isRange, allFontes,
   } = useDerivedData(criadoStart, criadoEnd, terminoStart, terminoEnd, fonteFilter);
 
   const tabProps = {
     CURR, PREV, trend, N, trend6, N6, last6,
     investRevenueVendas, investRevenueVendasInc,
+    investRevenueVendasPrevYear, investRevenueVendasIncPrevYear,
     filtered, filteredTermino, isRange,
   };
 

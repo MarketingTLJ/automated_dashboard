@@ -8,7 +8,9 @@ import { generateAlerts } from '../utils/alertEngine.js';
 import { THR } from '../constants/index.js';
 
 export function Tab0_ResumoExecutivo({
-  CURR, PREV, trend6, N6, investRevenueVendas, investRevenueVendasInc,
+  CURR, PREV, trend6, N6,
+  investRevenueVendas, investRevenueVendasInc,
+  investRevenueVendasPrevYear, investRevenueVendasIncPrevYear,
   filtered, filteredTermino, isRange,
   periodStart, periodEnd, taxaGeralCurr, taxaGeralPrev,
 }) {
@@ -213,15 +215,27 @@ export function Tab0_ResumoExecutivo({
       <div className="grid grid-cols-1 gap-5 mt-5">
         <div className="glass-card rounded-2xl p-5">
           <p className="text-gray-700 text-xs uppercase tracking-widest font-semibold mb-4">
-            Novas Vendas — Todas as Fontes · Últimos 6 Meses
+            Novas Vendas — Todas as Fontes · Últimos 6 Meses (2026)
           </p>
           <RevenueInvestmentTrend data={investRevenueVendas} />
         </div>
         <div className="glass-card rounded-2xl p-5">
           <p className="text-gray-700 text-xs uppercase tracking-widest font-semibold mb-4">
-            Novas Vendas + Incrementos — Todas as Fontes · Últimos 6 Meses
+            Novas Vendas — Todas as Fontes · 6 Meses Atuais (2025)
+          </p>
+          <RevenueInvestmentTrend data={investRevenueVendasPrevYear} />
+        </div>
+        <div className="glass-card rounded-2xl p-5">
+          <p className="text-gray-700 text-xs uppercase tracking-widest font-semibold mb-4">
+            Novas Vendas + Incrementos — Todas as Fontes · Últimos 6 Meses (2026)
           </p>
           <RevenueInvestmentTrend data={investRevenueVendasInc} />
+        </div>
+        <div className="glass-card rounded-2xl p-5">
+          <p className="text-gray-700 text-xs uppercase tracking-widest font-semibold mb-4">
+            Novas Vendas + Incrementos — Todas as Fontes · 6 Meses Atuais (2025)
+          </p>
+          <RevenueInvestmentTrend data={investRevenueVendasIncPrevYear} />
         </div>
       </div>
     </div>
