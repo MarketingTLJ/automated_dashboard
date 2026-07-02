@@ -1,4 +1,4 @@
-﻿import { AreaChart, Area, BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Cell } from 'recharts';
+﻿import { AreaChart, Area, BarChart, Bar, LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer, Cell } from 'recharts';
 import { SectionHeader } from '../components/ui/SectionHeader.jsx';
 import { KpiCard } from '../components/ui/KpiCard.jsx';
 import { RevenueStackedBar } from '../components/charts/RevenueStackedBar.jsx';
@@ -44,7 +44,7 @@ export function Tab1_Receita({ CURR, PREV, trend, trend6, N6, filtered, isRange 
           <p className="text-green-400 text-sm font-bold">{fmt(CURR.ticket)}</p>
         </div>
         <ResponsiveContainer width="100%" height={180}>
-          <AreaChart data={trend}>
+          <AreaChart data={trend6}>
             <defs>
               <linearGradient id="tg" x1="0" y1="0" x2="0" y2="1">
                 <stop offset="5%" stopColor={COLORS.vendas} stopOpacity={0.3} />
@@ -58,6 +58,28 @@ export function Tab1_Receita({ CURR, PREV, trend, trend6, N6, filtered, isRange 
             <Area type="monotone" dataKey="ticket" name="Ticket Médio" stroke={COLORS.vendas}
               fill="url(#tg)" strokeWidth={2} dot={{ fill: COLORS.vendas, r: 3 }} />
           </AreaChart>
+        </ResponsiveContainer>
+      </div>
+
+      {/* Faturamento — Total vs Novas Vendas vs Incrementos */}
+      <div className="glass-card rounded-2xl p-5 mb-6">
+        <p className="text-gray-700 text-xs uppercase tracking-widest font-semibold mb-4">
+          Evolução de Faturamento — Total, Novas Vendas e Incrementos
+        </p>
+        <ResponsiveContainer width="100%" height={180}>
+          <LineChart data={trend6}>
+            <CartesianGrid strokeDasharray="3 3" stroke="#e5e7eb" />
+            <XAxis dataKey="mes" tick={{ fill: '#6b7280', fontSize: 10 }} axisLine={false} tickLine={false} />
+            <YAxis tickFormatter={fmtK} tick={{ fill: '#6b7280', fontSize: 10 }} axisLine={false} tickLine={false} />
+            <Tooltip content={<ChartTooltip currency />} />
+            <Legend wrapperStyle={{ color: '#374151', fontSize: '11px' }} />
+            <Line type="monotone" dataKey="total_rec" name="Faturamento Total" stroke={COLORS.brandBlue}
+              strokeWidth={2} dot={{ fill: COLORS.brandBlue, r: 3 }} />
+            <Line type="monotone" dataKey="vendas" name="Novas Vendas" stroke={COLORS.vendas}
+              strokeWidth={2} dot={{ fill: COLORS.vendas, r: 3 }} />
+            <Line type="monotone" dataKey="inc" name="Incrementos" stroke={COLORS.incrementos}
+              strokeWidth={2} dot={{ fill: COLORS.incrementos, r: 3 }} />
+          </LineChart>
         </ResponsiveContainer>
       </div>
 
