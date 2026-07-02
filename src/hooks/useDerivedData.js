@@ -74,6 +74,7 @@ function buildTrend(arr) {
     reunioes:   d.reunioes,
     ganho:      d.ganho,
     perdido:    d.perdido,
+    aberto:     d.aberto,
     taxa_fech:  d.taxa_fech,
     taxa_geral: d.leads_total > 0 ? +((d.qtd_v / d.leads_total) * 100).toFixed(1) : 0,
     inv:        d.inv,
@@ -82,6 +83,17 @@ function buildTrend(arr) {
     ticket:     d.ticket,
     total_rec:  d.rec_v + d.rec_i + d.rec_r,
     pp:         d.pp,
+    valor_ganho_prop:   d.valor_ganho_prop   ?? 0,
+    valor_perdido_prop: d.valor_perdido_prop ?? 0,
+    valor_aberto_prop:  d.valor_aberto_prop  ?? 0,
+    valor_total_prop:   d.valor_total_prop   ?? 0,
+    rent_valor_ganho:   d.rent_valor_ganho   ?? 0,
+    rent_valor_perdido: d.rent_valor_perdido ?? 0,
+    rent_valor_aberto:  d.rent_valor_aberto  ?? 0,
+    rent_valor_total:   d.rent_valor_total   ?? 0,
+    rent_qtd_ganho:     d.rent_qtd_ganho     ?? 0,
+    rent_qtd_perdido:   d.rent_qtd_perdido   ?? 0,
+    rent_qtd_aberto:    d.rent_qtd_aberto    ?? 0,
   }));
 }
 

@@ -2,11 +2,12 @@
 import { SectionHeader } from '../components/ui/SectionHeader.jsx';
 import { MotifBars } from '../components/ui/MotifBars.jsx';
 import { StatusBadge } from '../components/ui/StatusBadge.jsx';
+import { ProposalValueStackedBar } from '../components/charts/ProposalValueStackedBar.jsx';
 import { fmt } from '../utils/formatters.js';
 import { THR, COLORS } from '../constants/index.js';
 import { closerRespToArr } from '../utils/respToArray.js';
 
-export function Tab3_PerformanceClosers({ CURR, filtered, isRange }) {
+export function Tab3_PerformanceClosers({ CURR, trend6, filtered, isRange }) {
   const [sel, setSel] = useState(null);
   if (!CURR) return null;
 
@@ -150,6 +151,32 @@ export function Tab3_PerformanceClosers({ CURR, filtered, isRange }) {
             </div>
           </div>
         </div>
+      </div>
+
+      {/* Evolução de Valor em Propostas — últimos 6 meses, por mês de criação */}
+      <div className="glass-card rounded-2xl p-5 mt-5">
+        <p className="text-gray-700 text-xs uppercase tracking-widest font-semibold mb-1">
+          Evolução de Valor em Propostas — Últimos 6 Meses
+        </p>
+        <p className="text-gray-600 text-xs mb-4">
+          Valor total gerenciado pelos closers por mês de criação (Convertido + Perdido + Em Aberto) · status atual
+        </p>
+        <ProposalValueStackedBar data={trend6} />
+      </div>
+
+      {/* Evolução de Valor Rentabilização (Expansão) — últimos 6 meses */}
+      <div className="glass-card rounded-2xl p-5 mt-5">
+        <p className="text-gray-700 text-xs uppercase tracking-widest font-semibold mb-1">
+          Evolução de Valor Rentabilização (Expansão) — Últimos 6 Meses
+        </p>
+        <p className="text-gray-600 text-xs mb-4">
+          Valor total gerenciado em Rentabilização por mês de criação (Convertido + Perdido + Em Aberto) · status atual
+        </p>
+        <ProposalValueStackedBar
+          data={trend6}
+          keys={{ ganho: 'rent_valor_ganho', perdido: 'rent_valor_perdido', aberto: 'rent_valor_aberto' }}
+          qtyKeys={{ ganho: 'rent_qtd_ganho', perdido: 'rent_qtd_perdido', aberto: 'rent_qtd_aberto' }}
+        />
       </div>
     </div>
   );

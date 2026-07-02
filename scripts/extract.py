@@ -40,6 +40,12 @@ FASES_LC_RENOVADO  = {'11 - Renovado'}
 FASES_LC_CANCELADO = {'10 - Cancelado', '12 - Renovado com concorrente',
                       '13- Não está usando e não se adatpitou'}
 
+# Rentabilização — fases tratadas como Perdido no gráfico "Evolução de Valor
+# Rentabilização (Expansão)". 'Duplicados' é excluído do total (não é oportunidade real).
+FASES_PERDIDO_RENT = {'Proposta Perdida', 'Finalizado sem oportunidade de venda',
+                       'Não Renovou a Licença'}
+FASE_EXCLUIR_RENT = {'Duplicados'}
+
 # All months to process — skip months with no data
 ALL_MONTHS = [
     ("2025-01","Jan/25"), ("2025-02","Fev/25"), ("2025-03","Mar/25"),
@@ -319,6 +325,25 @@ def build_month(ym, label, sdr, closer, rent, lics, inv_map, inv_breakdown):
     aberto  = lc - ganho - perdido
     taxa_fech = round(ganho/(ganho+perdido)*100, 1) if ganho+perdido > 0 else 0.0
 
+    # ─── VALOR GERENCIADO EM PROPOSTAS (por criação, status atual) ────────────
+    # Mesma safra do pipeline health acima, mas em R$ em vez de contagem —
+    # usado no gráfico "Evolução de Valor em Propostas" da aba Closers.
+    valor_ganho_prop   = float(round(c[c['Fase']=='Venda - Ganho']['Renda'].sum(), 2))
+    valor_perdido_prop = float(round(c[c['Fase']=='Perdido']['Renda'].sum(), 2))
+    valor_total_prop   = float(round(c['Renda'].sum(), 2))
+    valor_aberto_prop  = round(max(valor_total_prop - valor_ganho_prop - valor_perdido_prop, 0), 2)
+
+    # ─── VALOR RENTABILIZAÇÃO / EXPANSÃO (por criação, status atual) ──────────
+    # Mesma lógica acima, mas para a base de Rentabilização. Duplicados excluídos.
+    r_vol_valid = r_vol[~r_vol['Fase'].isin(FASE_EXCLUIR_RENT)]
+    rent_valor_ganho   = float(round(r_vol_valid[r_vol_valid['Fase']=='8 - Ganho']['Renda'].sum(), 2))
+    rent_valor_perdido = float(round(r_vol_valid[r_vol_valid['Fase'].isin(FASES_PERDIDO_RENT)]['Renda'].sum(), 2))
+    rent_valor_total   = float(round(r_vol_valid['Renda'].sum(), 2))
+    rent_valor_aberto  = round(max(rent_valor_total - rent_valor_ganho - rent_valor_perdido, 0), 2)
+    rent_qtd_ganho     = _safe_int((r_vol_valid['Fase']=='8 - Ganho').sum())
+    rent_qtd_perdido   = _safe_int(r_vol_valid['Fase'].isin(FASES_PERDIDO_RENT).sum())
+    rent_qtd_aberto    = max(len(r_vol_valid) - rent_qtd_ganho - rent_qtd_perdido, 0)
+
     # ─── VENDAS DO MÊS: por Data de fechamento (concluídas no mês) ───────────
     c_fechado = closer[
         (closer['dt_fech'].dt.year==y) &
@@ -443,6 +468,17 @@ def build_month(ym, label, sdr, closer, rent, lics, inv_map, inv_breakdown):
         'perdido':      perdido,
         'aberto':       max(aberto, 0),
         'taxa_fech':    taxa_fech,
+        'valor_ganho_prop':   valor_ganho_prop,
+        'valor_perdido_prop': valor_perdido_prop,
+        'valor_aberto_prop':  valor_aberto_prop,
+        'valor_total_prop':   valor_total_prop,
+        'rent_valor_ganho':   rent_valor_ganho,
+        'rent_valor_perdido': rent_valor_perdido,
+        'rent_valor_aberto':  rent_valor_aberto,
+        'rent_valor_total':   rent_valor_total,
+        'rent_qtd_ganho':     rent_qtd_ganho,
+        'rent_qtd_perdido':   rent_qtd_perdido,
+        'rent_qtd_aberto':    rent_qtd_aberto,
         'rec_v':        rec_v,
         'qtd_v':        qtd_v,
         'rec_i':        rec_i,
