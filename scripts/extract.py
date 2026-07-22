@@ -25,10 +25,10 @@ ROOT    = Path(__file__).parent.parent
 REPORTS = ROOT / "Reports"
 OUTPUT  = ROOT / "src" / "data" / "data.js"
 
-FILE_CLOSER       = REPORTS / "BASE CLOSER - MODIFICADO 2025 a 01.07.25.xlsx"
-FILE_SDR          = REPORTS / "BASE SDR - MODIFICADO 2025 a 01.07.2026.xlsx"
-FILE_RENT         = REPORTS / "BASE RENTABILIZAÇÂO COMPLETA - 01.07.2026.xlsx"
-FILE_LC           = REPORTS / "BASE LICENCAS TODA - 01.07.2026.xlsx"
+FILE_CLOSER       = REPORTS / "BASE CLOSER - MODIFICADO 2025 a 22.07.25.xlsx"
+FILE_SDR          = REPORTS / "BASE SDR - MODIFICADO 2025 a 22.07.2026.xlsx"
+FILE_RENT         = REPORTS / "BASE RENTABILIZAÇÂO COMPLETA - 22.07.2026.xlsx"
+FILE_LC           = REPORTS / "BASE LICENCAS TODA - 22.07.2026.xlsx"
 FILE_INV          = REPORTS / "INVESTIMENTOS.xlsx"
 FILE_FONTES_PAGAS = REPORTS / "FontesPagas.xlsx"
 
@@ -54,6 +54,7 @@ ALL_MONTHS = [
     ("2025-10","Out/25"), ("2025-11","Nov/25"), ("2025-12","Dez/25"),
     ("2026-01","Jan/26"), ("2026-02","Fev/26"), ("2026-03","Mar/26"),
     ("2026-04","Abr/26"), ("2026-05","Mai/26"), ("2026-06","Jun/26"),
+    ("2026-07","Jul/26"),
 ]
 
 # Month label → YYYY-MM map (for investments)
