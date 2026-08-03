@@ -141,8 +141,12 @@ function expandFontes(fonteFilter) {
 /**
  * Returns a modified month record where lead/revenue metrics reflect only
  * the selected fontes. Derived metrics (ticket, roi, cac, cpl) are recalculated.
- * Fields not broken down by fonte (ganho, perdido, closer_resp, pp, etc.)
- * remain at their original totals — V1 scope.
+ *
+ * Cobre também toda a aba Análise SDR: status do SDR, leads efetivos, a tabela
+ * por responsável e os motivos de perda (geral e por responsável).
+ *
+ * Ainda NÃO quebrados por fonte (permanecem no total): ganho, perdido, aberto,
+ * taxa_fech, closer_resp, vendas_resp, pp e inv.
  */
 function applyFonteFilter(monthData, expandedFontes) {
   if (!expandedFontes.length) return monthData;
@@ -152,6 +156,12 @@ function applyFonteFilter(monthData, expandedFontes) {
   let qtd_v = 0, rec_v = 0;
   let qtd_i = 0, rec_i = 0;
   let qtd_r = 0, rec_r = 0;
+  let sdr_ativo = 0, sdr_perdido = 0, leads_descartados = 0;
+
+  // Estruturas da aba SDR, mescladas entre as fontes selecionadas
+  const sdr_resp    = {};   // { nome: { total, conv_closer, perdido } }
+  const sdr_mp_resp = {};   // { nome: { motivo: n } }
+  const mp_sdr      = {};   // { motivo: n }
 
   expandedFontes.forEach(f => {
     const d = pf[f];
@@ -164,9 +174,31 @@ function applyFonteFilter(monthData, expandedFontes) {
     rec_i        += d.rec_i        || 0;
     qtd_r        += d.qtd_r        || 0;
     rec_r        += d.rec_r        || 0;
+    sdr_ativo         += d.sdr_ativo   || 0;
+    sdr_perdido       += d.sdr_perdido || 0;
+    leads_descartados += d.descartados || 0;
+
+    Object.entries(d.sdr_resp || {}).forEach(([nome, st]) => {
+      if (!sdr_resp[nome]) sdr_resp[nome] = { total: 0, conv_closer: 0, perdido: 0 };
+      sdr_resp[nome].total       += st.total       || 0;
+      sdr_resp[nome].conv_closer += st.conv_closer || 0;
+      sdr_resp[nome].perdido     += st.perdido     || 0;
+    });
+
+    Object.entries(d.sdr_mp_resp || {}).forEach(([nome, motivos]) => {
+      if (!sdr_mp_resp[nome]) sdr_mp_resp[nome] = {};
+      Object.entries(motivos || {}).forEach(([m, v]) => {
+        sdr_mp_resp[nome][m] = (sdr_mp_resp[nome][m] || 0) + v;
+      });
+    });
+
+    Object.entries(d.mp_sdr || {}).forEach(([m, v]) => {
+      mp_sdr[m] = (mp_sdr[m] || 0) + v;
+    });
   });
 
-  const leads_total = leads_sdr + leads_closer;
+  const leads_total    = leads_sdr + leads_closer;
+  const leads_efetivos = Math.max(leads_total - leads_descartados, 0);
   const inv         = monthData.inv; // investment is not per-fonte
   const ticket      = qtd_v > 0  ? +(rec_v / qtd_v).toFixed(0)            : 0;
   const roi         = inv   > 0  ? +((rec_v - inv) / inv).toFixed(1)       : 0;
@@ -183,6 +215,11 @@ function applyFonteFilter(monthData, expandedFontes) {
   return {
     ...monthData,
     leads_sdr, leads_closer, leads_total,
+    // reuniões = leads criados no Closer (regra de negócio) — segue o filtro
+    reunioes: leads_closer,
+    leads_efetivos, leads_descartados,
+    sdr_ativo, sdr_perdido,
+    sdr_resp, sdr_mp_resp, mp_sdr,
     qtd_v, rec_v, qtd_i, rec_i, qtd_r, rec_r,
     ticket, roi, lucro_bruto, cac, cpl, inv,
     fonte_sdr,

@@ -384,16 +384,36 @@ App.jsx [fonteFilter: string[]]
 Quando o usuário seleciona "Fontes Pagas", o array inclui `'__pagas__'`.
 `expandFontes()` no hook expande esse sentinela para todos os nomes em `FONTES_PAGAS`.
 
-### Escopo V1 (o que é filtrado)
-- `leads_sdr`, `leads_closer`, `leads_total`
+### Escopo V2 (o que é filtrado) — atualizado 2026-08-03
+- `leads_sdr`, `leads_closer`, `leads_total`, `reunioes`
 - `qtd_v`, `rec_v`, `qtd_i`, `rec_i`, `qtd_r`, `rec_r`
 - Derivados: `ticket`, `roi`, `cac`, `cpl`, `lucro_bruto`
 - `fonte_sdr` (distribuição por fonte no Tab4)
+- **Aba Análise SDR completa (V2):** `sdr_ativo`, `sdr_perdido`,
+  `leads_efetivos`, `leads_descartados`, `sdr_resp` (tabela por responsável),
+  `sdr_mp_resp` (drill-down de motivos) e `mp_sdr` (motivos gerais)
 
-### Escopo V1 (o que NÃO é filtrado — permanece total)
-- `ganho`, `perdido`, `aberto`, `taxa_fech` (não quebrados por fonte)
-- `closer_resp`, `sdr_resp`, `pp` (estruturas complexas)
+### O que ainda NÃO é filtrado (permanece total)
+- `ganho`, `perdido`, `aberto`, `taxa_fech` (funil Closer, não quebrado por fonte)
+- `closer_resp`, `vendas_resp`, `pp` (abas Closers e Propostas Perdidas)
 - `inv` (investimento não é rastreado por fonte)
+
+> ⚠️ **Ao adicionar um KPI que deve responder ao filtro**, não basta criar o campo no
+> `build_month`: é preciso (1) gerar a métrica por fonte em `_build_por_fonte` e
+> (2) somá-la em `applyFonteFilter`. Se esquecer, o card fica **congelado no total**
+> enquanto o denominador filtra — produzindo percentuais acima de 100%, sem erro visível.
+> Foi exatamente o que aconteceu com `leads_efetivos` (185% dos leads gerados).
+
+### Teste de sanidade do filtro
+Somar **todas** as fontes de `por_fonte` tem de reproduzir exatamente os totais do mês.
+Se divergir, o breakdown está perdendo ou duplicando registros:
+
+```
+Σ por_fonte[f].leads_sdr   == leads_sdr
+Σ por_fonte[f].sdr_perdido == sdr_perdido
+Σ por_fonte[f].descartados == leads_descartados
+Σ por_fonte[f].sdr_resp[nome].total == sdr_resp[nome].total
+```
 
 ### Atualização de fontes pagas
 1. Editar `Reports/FontesPagas.xlsx` (coluna "Fonte Paga?")
@@ -501,4 +521,4 @@ lista muda no `extract.py`. Nunca duplicar essa lista no front.
 
 ---
 
-*Última atualização: Ago/2026 | v4.4 — Leads Efetivos (§14) + reordenação dos KPIs da Aba 5*
+*Última atualização: Ago/2026 | v4.5 — Filtro de Fonte V2: cobre toda a aba Análise SDR (§12)*

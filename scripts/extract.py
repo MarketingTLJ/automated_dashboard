@@ -225,13 +225,26 @@ def _build_por_fonte(s, c, c_fechado, r_inc, r_ren):
     """
     Builds per-fonte breakdown dict combining SDR leads, Closer leads,
     won deals, incrementos, and renovações.
-    Returns { fonte_name: { leads_sdr, leads_closer, qtd_v, rec_v, qtd_i, rec_i, qtd_r, rec_r } }
+
+    Além dos totais, carrega TUDO que a aba Análise SDR precisa para responder ao
+    filtro de fonte: status do SDR (ativo/perdido), descartados (leads efetivos),
+    a tabela por responsável e os motivos de perda — geral e por responsável.
+
+    Returns { fonte_name: {
+        leads_sdr, leads_closer, qtd_v, rec_v, qtd_i, rec_i, qtd_r, rec_r,
+        sdr_ativo, sdr_perdido, descartados,
+        sdr_resp: { nome: {total, conv_closer, perdido} },
+        sdr_mp_resp: { nome: {motivo: n} },
+        mp_sdr: { motivo: n },
+    } }
     """
     _empty = lambda: {
         'leads_sdr': 0, 'leads_closer': 0,
         'qtd_v': 0, 'rec_v': 0.0,
         'qtd_i': 0, 'rec_i': 0.0,
         'qtd_r': 0, 'rec_r': 0.0,
+        'sdr_ativo': 0, 'sdr_perdido': 0, 'descartados': 0,
+        'sdr_resp': {}, 'sdr_mp_resp': {}, 'mp_sdr': {},
     }
     result = {}
 
@@ -239,19 +252,60 @@ def _build_por_fonte(s, c, c_fechado, r_inc, r_ren):
         if f not in result:
             result[f] = _empty()
 
-    # SDR leads by fonte
+    def _fname(fonte):
+        return str(fonte).strip() or 'Não identificado'
+
+    # Closer da mesma fonte — usado para o conv_closer da tabela por responsável
+    c_por_fonte = {}
+    if 'Fonte' in c.columns:
+        for fonte, grp in c.groupby(c['Fonte'].fillna('Não identificado')):
+            c_por_fonte[_fname(fonte)] = grp
+
+    # SDR leads by fonte — volume, status, motivos e tabela por responsável
     if 'Fonte' in s.columns:
         for fonte, grp in s.groupby(s['Fonte'].fillna('Não identificado')):
-            f = str(fonte).strip() or 'Não identificado'
+            f = _fname(fonte)
             _ensure(f)
             result[f]['leads_sdr'] += len(grp)
+
+            perd = grp[grp['FaseAdj'] == 'Perdido']
+            result[f]['sdr_perdido']  = _safe_int(len(perd))
+            result[f]['sdr_ativo']    = _safe_int(
+                len(grp[~grp['FaseAdj'].isin({'Perdido', 'Reunião Realizada'})]))
+            result[f]['mp_sdr']       = _motivos(perd)
+            result[f]['descartados'] += _descartados(perd)
+
+            # Tabela por responsável — conv_closer só conta o Closer da MESMA fonte
+            cf = c_por_fonte.get(f)
+            resp = {}
+            for nome in sorted(grp['Responsável'].dropna().unique()):
+                sub = grp[grp['Responsável'] == nome]
+                conv = 0
+                if cf is not None and '#TLJ# SDR' in cf.columns:
+                    conv = _safe_int(len(cf[cf['#TLJ# SDR'] == nome]))
+                resp[str(nome)] = {
+                    'total':       len(sub),
+                    'conv_closer': conv,
+                    'perdido':     _safe_int(len(sub[sub['FaseAdj'] == 'Perdido'])),
+                }
+            result[f]['sdr_resp'] = resp
+
+            # Motivos de perda por responsável (drill-down da tabela)
+            mp_resp = {}
+            for nome in perd['Responsável'].dropna().unique():
+                sub_p = perd[perd['Responsável'] == nome]
+                if len(sub_p) > 0:
+                    mp_resp[str(nome)] = _motivos(sub_p)
+            result[f]['sdr_mp_resp'] = mp_resp
 
     # Closer leads by fonte (criado)
     if 'Fonte' in c.columns:
         for fonte, grp in c.groupby(c['Fonte'].fillna('Não identificado')):
-            f = str(fonte).strip() or 'Não identificado'
+            f = _fname(fonte)
             _ensure(f)
             result[f]['leads_closer'] += len(grp)
+            # perdas do Closer também contam para os descartados de leads efetivos
+            result[f]['descartados']  += _descartados(grp[grp['Fase'] == 'Perdido'])
 
     # Vendas fechadas by fonte
     if 'Fonte' in c_fechado.columns:
