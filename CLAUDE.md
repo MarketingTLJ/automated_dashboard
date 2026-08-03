@@ -141,6 +141,7 @@ Arquivo: `INVESTIMENTOS.xlsx`
 | Métrica | Filtro | Fórmula |
 |---------|--------|---------|
 | Total Leads | `Criado` no mês | SDR criados + Closer criados |
+| **Leads Efetivos** | `Criado` no mês | `leads_total − leads_descartados` — ver §14 |
 | Reuniões | `Criado` no mês | = `leads_closer` |
 | Qtd Vendas (qtd_v) | `Data de fechamento` + Fase=Ganho | Closer |
 | Receita Novas Vendas (rec_v) | `Data de fechamento` + Fase=Ganho | Closer `Renda` |
@@ -169,15 +170,27 @@ Arquivo: `INVESTIMENTOS.xlsx`
 ## 5. ATUALIZAÇÃO MENSAL
 
 ```
-[ ] 1. Receber Excel atualizados em Reports/
+[ ] 1. Receber Excel atualizados em Reports/ (nomes de arquivo mudam a cada envio —
+        conferir a data no nome e atualizar FILE_CLOSER/FILE_SDR/FILE_RENT/FILE_LC
+        em scripts/extract.py se necessário)
 [ ] 2. python scripts/extract.py
 [ ] 3. Validar números-chave no output:
         - Total leads do mês
         - Ganhos e receita novas vendas
         - PP total e valor
         - Investimento total
-[ ] 4. Abrir npm run dev e verificar visualmente as 7 abas
-[ ] 5. Commit: "data: add MMM/26"
+        - Se aparecer erro/zero inesperado: checar se algum nome de Fase mudou no
+          Bitrix (já aconteceu com 'Ganho'→'Venda - Ganho' no Closer e com as fases
+          de perda do SDR — ver §3.1/§3.2) ou se o cabeçalho de mês em
+          INVESTIMENTOS.xlsx não segue o padrão 'mmm/aa' minúsculo
+[ ] 4. npm run build (valida que compila sem erros antes de subir)
+[ ] 5. npm run dev e verificar visualmente as abas relevantes
+[ ] 6. git add <arquivos relevantes> (nunca `git add -A` — evita commitar
+        .claude/settings.local.json, .temp/, .trash/)
+[ ] 7. git commit -m "data: add MMM/26" && git push origin main
+[ ] 8. Disparar o deploy manual — ver §13. DEPLOY (o auto-deploy do Vercel
+        não está disparando sozinho a cada push)
+[ ] 9. Aguardar 1-3 min e conferir https://automated-dashboard.vercel.app (Ctrl+F5)
 ```
 
 ---
@@ -389,4 +402,103 @@ Quando o usuário seleciona "Fontes Pagas", o array inclui `'__pagas__'`.
 
 ---
 
-*Última atualização: Ago/2026 | v4.2 — Correção FASES_PERDIDO_SDR (etapas renomeadas no Bitrix) + CPL sempre por criação*
+## 13. DEPLOY
+
+### Fluxo completo
+```
+1. python scripts/extract.py     ← gera novo data.js
+2. npm run build                 ← valida que compila sem erros
+3. git add <arquivos relevantes> ← nunca `git add -A`
+4. git commit -m "..."
+5. git push origin main
+6. Disparar deploy manual (ver "Deploy Hook" abaixo)
+7. Aguardar 1-3 min, conferir https://automated-dashboard.vercel.app (Ctrl+F5)
+```
+
+### ⚠️ Por que o deploy é manual
+O projeto está conectado ao Vercel via integração Git
+(`github.com/MarketingTLJ/automated_dashboard` → projeto `automated-dashboard` no
+Vercel), que **deveria** disparar deploy automático a cada push em `main`. Essa
+integração **não está disparando de forma confiável** — verificado em 2026-07:
+pushes para `main` não geravam nenhuma entrada nova na aba "Deployments" do Vercel
+(o site continuava servindo um commit antigo). Causa raiz não diagnosticada até
+o momento (suspeita: webhook GitHub→Vercel quebrado ou desconectado — ver
+"Resolver a causa raiz" abaixo). **Até isso ser corrigido, todo deploy precisa ser
+disparado manualmente via Deploy Hook.**
+
+### Deploy Hook (mecanismo manual atual)
+Existe um **Vercel Deploy Hook** já criado (Vercel → Settings → Git → Deploy Hooks,
+branch `main`) — uma URL que, ao receber um `POST`, dispara build+deploy do commit
+mais recente de `main`, sem depender do webhook automático.
+
+- A URL vive em `.env.local` na raiz do projeto (`VERCEL_DEPLOY_HOOK_URL=...`).
+- **Nunca commitar essa URL** em CLAUDE.md, código, ou qualquer arquivo versionado —
+  o repositório é **público**; a URL funciona como uma senha (qualquer pessoa com
+  ela pode disparar deploys no projeto).
+- Se `.env.local` não existir na sessão atual (ex: outra máquina, outro chat), peça
+  a URL ao usuário ou oriente-o a gerar uma nova: Vercel → Settings → Git → Deploy
+  Hooks → Name: qualquer nome → Branch: `main` → Create Hook.
+- Para disparar (depois do `git push`):
+  ```bash
+  curl -X POST "$VERCEL_DEPLOY_HOOK_URL"
+  ```
+  Resposta esperada: HTTP 201 com `{"job":{"id":"...","state":"PENDING",...}}`.
+  Isso confirma que o job de build foi enfileirado — não que o deploy já terminou.
+
+### Links de referência
+- Produção: https://automated-dashboard.vercel.app
+- Repositório: https://github.com/MarketingTLJ/automated_dashboard
+- Painel Vercel: https://vercel.com/grupo-tlj-s-projects/automated-dashboard
+
+### Resolver a causa raiz (pendente — faria o Deploy Hook desnecessário)
+1. Vercel → Settings → Git → "Disconnect", depois "Connect Git Repository"
+   novamente selecionando `automated_dashboard` / branch `main`
+2. OU no GitHub: repo → Settings → Webhooks → conferir se existe webhook para
+   `api.vercel.com` e se as "Recent Deliveries" mais recentes retornam sucesso
+3. Depois de corrigir, testar com um commit trivial e confirmar que aparece
+   sozinho em Vercel → Deployments antes de voltar a confiar no auto-deploy
+
+---
+
+---
+
+## 14. LEADS EFETIVOS
+
+**Definição:** oportunidades reais do período — todos os leads gerados menos as perdas
+de leads que nunca chegaram a ser trabalhados.
+
+```
+leads_efetivos = leads_total − leads_descartados
+
+leads_descartados = perdas (SDR + Closer) cujo `[SDR] Motivo de perda`
+                    está em MOTIVOS_NAO_EFETIVOS
+```
+
+**`MOTIVOS_NAO_EFETIVOS`** (em `extract.py`, exportado para `data.js`):
+`Card Duplicado` · `Testes` · `Dados incorretos/ Impossível contato`
+
+> `Sem Contato / Sem Resposta` **não** entra: o lead existe e é real, apenas não respondeu —
+> continua sendo uma oportunidade perdida legítima (decisão do usuário em 2026-08-03).
+
+> ⚠️ Grafia validada contra as bases em 2026-08-03. Se um motivo for renomeado no Bitrix,
+> ele deixa de ser descontado **silenciosamente** — o número apenas sobe, sem erro.
+> Revalidar junto com `FASES_PERDIDO_SDR`.
+
+### Por que não é uma soma de parcelas
+A formulação original era *"Em Andamento SDR + Leads em Closer + Perdidos em Closer ou SDR
+(exceto os motivos)"*. Somar assim conta os perdidos do Closer **duas vezes**, porque
+`leads_closer` já inclui ganhos, perdidos e em aberto daquele pipeline (em Jul/26 isso daria
+136 em vez de 125). Por isso a implementação é `total − descartados`, que é a mesma
+intenção sem dupla contagem e trata SDR e Closer simetricamente.
+
+### Onde aparece
+Aba 5 (`Tab4_AnaliseSdr.jsx`) — 2º card da linha de KPIs, mais a nota explicativa logo abaixo.
+A nota lê `MOTIVOS_NAO_EFETIVOS` de `data.js`, então **o texto se atualiza sozinho** quando a
+lista muda no `extract.py`. Nunca duplicar essa lista no front.
+
+**Referência Jul/26:** 178 gerados − 22 descartados = **156 efetivos (87,6%)**
+(descartados: Card Duplicado 9 + Testes 8 + Dados incorretos 5)
+
+---
+
+*Última atualização: Ago/2026 | v4.4 — Leads Efetivos (§14) + reordenação dos KPIs da Aba 5*

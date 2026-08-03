@@ -204,6 +204,9 @@ function buildPeriodCurr(filtered, filteredT, label) {
   const leads_closer = sumKey(filtered, 'leads_closer');
   const leads_total  = sumKey(filtered, 'leads_total');
   const reunioes     = sumKey(filtered, 'reunioes');
+  // Leads efetivos são aditivos entre meses (contagem simples), então somam direto
+  const leads_efetivos    = sumKey(filtered, 'leads_efetivos');
+  const leads_descartados = sumKey(filtered, 'leads_descartados');
   const sdr_perdido  = sumKey(filtered, 'sdr_perdido');
   const sdr_ativo    = sumKey(filtered, 'sdr_ativo');
   // ganho/perdido/aberto from criado (funnel analysis — "por criação")
@@ -266,6 +269,7 @@ function buildPeriodCurr(filtered, filteredT, label) {
     ym: filtered[filtered.length - 1]?.ym ?? '',
     label,
     leads_sdr, leads_closer, leads_total, reunioes, sdr_perdido, sdr_ativo,
+    leads_efetivos, leads_descartados,
     ganho: ganho_c, perdido: perdido_c, aberto: aberto_c, taxa_fech: taxa_fech_c,
     qtd_v, rec_v, qtd_i, rec_i, qtd_r, rec_r, ticket,
     inv, lucro_bruto, roi, cac, cpl,

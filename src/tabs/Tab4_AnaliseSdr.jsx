@@ -5,6 +5,7 @@ import { MotifBars } from '../components/ui/MotifBars.jsx';
 import { StatusBadge } from '../components/ui/StatusBadge.jsx';
 import { pct } from '../utils/formatters.js';
 import { THR, COLORS, THR_PERDA_SDR } from '../constants/index.js';
+import { MOTIVOS_NAO_EFETIVOS } from '../data/data.js';
 import { sdrRespToArr } from '../utils/respToArray.js';
 
 export function Tab4_AnaliseSdr({ CURR, PREV, filtered, isRange }) {
@@ -23,19 +24,48 @@ export function Tab4_AnaliseSdr({ CURR, PREV, filtered, isRange }) {
       <SectionHeader number={4} title="Análise SDR & Geração de Leads" subtitle="👆 Clique no nome para filtrar motivos de perda" />
 
       {/* KPIs */}
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-7">
+      <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-4 mb-3">
         <KpiCard title="Total Leads Gerados" value={CURR.leads_total}
           sub={`SDR ${CURR.leads_sdr} + Closer ${CURR.leads_closer}`}
           curr={CURR.leads_total} prev={PREV?.leads_total} color={COLORS.leads} icon="🎯" />
-        <KpiCard title="Reuniões (Closer)" value={CURR.reunioes}
-          sub="Leads criados no Closer"
-          curr={CURR.reunioes} prev={PREV?.reunioes} color={COLORS.reunioes} icon="📅" />
+        <KpiCard title="Total Leads Efetivos" value={CURR.leads_efetivos}
+          sub={pct(CURR.leads_efetivos, CURR.leads_total) + ' dos leads gerados'}
+          curr={CURR.leads_efetivos} prev={PREV?.leads_efetivos} color={COLORS.leadsEfetivos} icon="✨" />
         <KpiCard title="Em Andamento SDR" value={CURR.sdr_ativo}
           sub={pct(CURR.sdr_ativo, CURR.leads_sdr) + ' dos leads SDR'}
           curr={CURR.sdr_ativo} prev={PREV?.sdr_ativo} color="#22c55e" icon="⏳" />
+        <KpiCard title="Reuniões (Closer)" value={CURR.reunioes}
+          sub="Leads criados no Closer"
+          curr={CURR.reunioes} prev={PREV?.reunioes} color={COLORS.reunioes} icon="📅" />
         <KpiCard title="Perdidos SDR" value={CURR.sdr_perdido}
           sub={pct(CURR.sdr_perdido, CURR.leads_sdr) + ' dos leads SDR'}
           curr={CURR.sdr_perdido} prev={PREV?.sdr_perdido} color={COLORS.brandRed} icon="❌" inv />
+      </div>
+
+      {/* Nota explicativa — Leads Efetivos */}
+      <div className="glass-card rounded-2xl p-4 mb-7 border-l-4" style={{ borderLeftColor: COLORS.leadsEfetivos }}>
+        <p className="text-gray-900 text-xs font-semibold mb-1.5">
+          ✨ O que são <span style={{ color: COLORS.leadsEfetivos }}>Leads Efetivos</span>?
+        </p>
+        <p className="text-gray-600 text-xs leading-relaxed">
+          São as <strong>oportunidades reais</strong> do período: todos os leads gerados
+          (SDR + Closer) <strong>menos</strong> as perdas de leads que nunca chegaram a ser
+          trabalhados. Ficam de fora as perdas com motivo{' '}
+          {MOTIVOS_NAO_EFETIVOS.map((m, i) => (
+            <span key={m}>
+              {i > 0 && (i === MOTIVOS_NAO_EFETIVOS.length - 1 ? ' e ' : ', ')}
+              <strong className="text-gray-700">{m}</strong>
+            </span>
+          ))}
+          {' '}— casos em que o lead nunca respondeu, era duplicata, teste ou cadastro inválido.
+        </p>
+        <p className="text-gray-500 text-xs mt-2">
+          {isRange ? 'No período' : `Em ${CURR.label}`}:{' '}
+          <strong className="text-gray-700">{CURR.leads_total}</strong> leads gerados −{' '}
+          <strong className="text-gray-700">{CURR.leads_descartados}</strong> descartados ={' '}
+          <strong style={{ color: COLORS.leadsEfetivos }}>{CURR.leads_efetivos}</strong> efetivos
+          {' '}({pct(CURR.leads_efetivos, CURR.leads_total)} do total).
+        </p>
       </div>
 
       {/* SDR table */}

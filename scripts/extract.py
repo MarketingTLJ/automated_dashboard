@@ -47,6 +47,16 @@ FASES_PERDIDO_SDR = {
     'Nutrição',                         # legado 2025
 }
 
+# Motivos de perda que NÃO representam oportunidade real — o lead nunca chegou a
+# ser trabalhado (nunca respondeu, era duplicata, teste ou cadastro inválido).
+# Perdas com estes motivos são descontadas de `leads_efetivos`.
+# Grafia validada contra as bases SDR e Closer em 2026-08-03 — conferir ao mudar no Bitrix.
+MOTIVOS_NAO_EFETIVOS = {
+    'Card Duplicado',
+    'Testes',
+    'Dados incorretos/ Impossível contato',
+}
+
 # Licenças CS — fases de sucesso e churn
 FASES_LC_RENOVADO  = {'11 - Renovado'}
 FASES_LC_CANCELADO = {'10 - Cancelado', '12 - Renovado com concorrente',
@@ -204,6 +214,13 @@ def _motivos(df, col='[SDR] Motivo de perda', n=8):
     return {str(k): _safe_int(v) for k, v in df[col].value_counts().head(n).items()}
 
 
+def _descartados(df, col='[SDR] Motivo de perda'):
+    """Conta perdas cujo motivo está em MOTIVOS_NAO_EFETIVOS (lead nunca foi oportunidade)."""
+    if col not in df.columns or not len(df):
+        return 0
+    return _safe_int(df[col].isin(MOTIVOS_NAO_EFETIVOS).sum())
+
+
 def _build_por_fonte(s, c, c_fechado, r_inc, r_ren):
     """
     Builds per-fonte breakdown dict combining SDR leads, Closer leads,
@@ -337,6 +354,14 @@ def build_month(ym, label, sdr, closer, rent, lics, inv_map, inv_breakdown):
     perdido = _safe_int((c['Fase']=='Perdido').sum())
     aberto  = lc - ganho - perdido
     taxa_fech = round(ganho/(ganho+perdido)*100, 1) if ganho+perdido > 0 else 0.0
+
+    # ─── LEADS EFETIVOS (oportunidades reais) ────────────────────────────────
+    # Todos os leads criados no mês MENOS as perdas que nunca chegaram a ser
+    # oportunidade (MOTIVOS_NAO_EFETIVOS), tanto no SDR quanto no Closer.
+    # Equivale a "em andamento SDR + leads no Closer + perdidos com motivo real".
+    leads_descartados = (_descartados(s[s['FaseAdj']=='Perdido'])
+                         + _descartados(c[c['Fase']=='Perdido']))
+    leads_efetivos    = max((ls + lc) - leads_descartados, 0)
 
     # ─── VALOR GERENCIADO EM PROPOSTAS (por criação, status atual) ────────────
     # Mesma safra do pipeline health acima, mas em R$ em vez de contagem —
@@ -474,6 +499,8 @@ def build_month(ym, label, sdr, closer, rent, lics, inv_map, inv_breakdown):
         'leads_sdr':    ls,
         'leads_closer': lc,
         'leads_total':  ls + lc,
+        'leads_efetivos':    leads_efetivos,
+        'leads_descartados': leads_descartados,
         'reunioes':     lc,
         'sdr_perdido':  _safe_int((s['FaseAdj']=='Perdido').sum()),
         'sdr_ativo':    _safe_int(len(s[~s['FaseAdj'].isin({'Perdido','Reunião Realizada'})])),
@@ -549,6 +576,10 @@ def build_month_termino(ym, label, sdr, closer, rent, lics, inv_map, inv_breakdo
     aberto  = lc - ganho - perdido
     taxa_fech = round(ganho/(ganho+perdido)*100, 1) if ganho+perdido > 0 else 0.0
 
+    # Leads efetivos — mesma regra do build_month, mas sobre a safra de fechamento
+    leads_descartados = _descartados(s_perdido) + _descartados(c_perdido)
+    leads_efetivos    = max((ls + lc) - leads_descartados, 0)
+
     rec_v  = float(round(c_ganho['Renda'].sum(), 2))
     qtd_v  = ganho
     ticket = round(rec_v / qtd_v, 2) if qtd_v > 0 else 0.0
@@ -597,6 +628,8 @@ def build_month_termino(ym, label, sdr, closer, rent, lics, inv_map, inv_breakdo
         'leads_sdr':    ls,
         'leads_closer': lc,
         'leads_total':  ls + lc,
+        'leads_efetivos':    leads_efetivos,
+        'leads_descartados': leads_descartados,
         'reunioes':     lc,
         'sdr_perdido':  ls,
         'sdr_ativo':    0,
@@ -728,7 +761,9 @@ def main():
         f"// DATA_TERMINO: {monthly_termino[0]['label'] if monthly_termino else '?'} → {monthly_termino[-1]['label'] if monthly_termino else '?'} ({len(monthly_termino)} months, by dt_fech)\n\n"
         f"export const DATA = {json.dumps(monthly, ensure_ascii=False, indent=2)};\n\n"
         f"export const DATA_TERMINO = {json.dumps(monthly_termino, ensure_ascii=False, indent=2)};\n\n"
-        f"export const FONTES_PAGAS = {json.dumps(sorted(fontes_pagas), ensure_ascii=False)};\n"
+        f"export const FONTES_PAGAS = {json.dumps(sorted(fontes_pagas), ensure_ascii=False)};\n\n"
+        f"// Motivos de perda descontados de `leads_efetivos` (lead nunca foi oportunidade real)\n"
+        f"export const MOTIVOS_NAO_EFETIVOS = {json.dumps(sorted(MOTIVOS_NAO_EFETIVOS), ensure_ascii=False)};\n"
     )
     OUTPUT.write_text(content, encoding='utf-8')
     print(f"\nWrote {len(monthly)} months (DATA) + {len(monthly_termino)} months (DATA_TERMINO) to {OUTPUT}")
