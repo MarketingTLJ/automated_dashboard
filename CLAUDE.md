@@ -59,10 +59,33 @@ Arquivo: `BASE SDR - MODIFICADO 2025 a 01.06.25.xlsx`
 | Fonte | `Fonte` | Google Ads, WhatsApp, etc. |
 | Motivo perda | `[SDR] Motivo de perda` | |
 
-**Fases tratadas como Perdido:**
+**Fases tratadas como Perdido** (revisado 2026-08-03):
 ```python
-FASES_PERDIDO_SDR = {'Perdido', 'Nutrição', 'Base de Oportunidade - Nutrição', 'Parar promocoes'}
+FASES_PERDIDO_SDR = {
+    'Perdido - sem reunião',        # fase atual de perda sem reunião
+    'Reunião realizada- Perdido',   # perda após reunião (grafia do Bitrix: sem espaço antes do hífen)
+    'Base de Oportunidade - Nutrição',
+    'Parar promocoes',
+    'Queria suporte',               # lead de suporte, não é oportunidade
+    'Perdido',                      # legado 2025
+    'Nutrição',                     # legado 2025 (0 registros hoje)
+}
 ```
+
+> ⚠️ **Os nomes das etapas do Bitrix mudam.** `'Perdido'` foi renomeado para
+> `'Perdido - sem reunião'` e o set antigo deixou 2.772 leads perdidos fora da conta
+> (Jul/26 mostrava 15 em vez de 102). **Sempre que uma etapa for criada/renomeada no
+> pipeline SDR, revalidar esta lista** rodando `scripts/inspect_excel.py` e conferindo
+> `df['Fase'].value_counts()` contra o set.
+
+**Fases NÃO consideradas perdido** (ficam em `sdr_ativo`): `Entrada`, `Em conexão`/`Em Conexão`,
+`Conectado - Em atendimento`, `Pré Qualificado`, `Qualificado`, `Oportunidade Ouro`,
+`Oportunidade Diamante`, `Reunião agendada`, `No-Show`.
+`Reunião Realizada` é excluída tanto de `sdr_ativo` quanto de `sdr_perdido` (lead avançou).
+
+> 🧹 **Sujeira de dados conhecida:** o pipeline tem `Em conexão` (26) e `Em Conexão` (21)
+> como etapas distintas — mesma etapa, caixa diferente. Não afeta perdidos (ambas são ativas),
+> mas convém unificar no Bitrix.
 
 ### 3.2 BASE CLOSER
 Arquivo: `BASE CLOSER - MODIFICADO 2025 a 01.06.25.xlsx`
@@ -129,12 +152,17 @@ Arquivo: `INVESTIMENTOS.xlsx`
 | ROI **Líquido** | — | `(rec_v - inv) / inv` ← Net ROI (lucro bruto / investimento) |
 | Lucro Bruto | — | `rec_v - inv` |
 | CAC | — | `inv / qtd_v` |
-| CPL | — | `inv / (leads_sdr + leads_closer)` |
+| CPL | **sempre por `Criado`** | `inv / leads_total` — investimento e leads do MESMO período de criação |
 | PP (Propostas Perdidas) | `Data de fechamento` + Fase=Perdido | Closer |
 | Meta ROI | — | `ROI_TARGET = 15x` (constante em `constants/index.js`) |
 
 > **Incrementos = Novas Vendas de Rentabilização** (vendas para clientes da carteira).
 > ROI = **Net ROI** = (Faturamento - Investimento) / Investimento. Não usar faturamento bruto / investimento.
+>
+> ⚠️ **CPL não olha Data de Término.** É o investimento do período dividido pelos leads
+> **criados** nesse mesmo período. Por isso `cpl` **não** entra em `WIN_FIELDS` e, em modo
+> período, usa `sumKey(filtered, 'inv')` — nunca o `inv` do término. ROI, CAC e Lucro Bruto
+> continuam no término, porque receita é por data de fechamento.
 
 ---
 
@@ -232,7 +260,8 @@ Tabs recebem `isRange` via props — nunca recalcular localmente.
 | `sdr_resp`, `sdr_mp_resp`, `fonte_sdr`, `mp_sdr` | `filtered` | SDR metrics por criação |
 | `closer_resp` | `filtered` | Pipeline view por criação (funil) |
 | `qtd_v`, `rec_v`, `qtd_i`, `rec_i`, `qtd_r`, `rec_r` | `filteredTermino` | Vendas por data de fechamento |
-| `inv`, `roi`, `cac`, `cpl`, `lucro_bruto` | `filteredTermino` | Investimento e ROI por período de término |
+| `inv`, `roi`, `cac`, `lucro_bruto` | `filteredTermino` | Investimento e ROI por período de término |
+| `cpl` | **`filtered`** (criado) | Investimento ÷ leads criados — ambos do período de criação |
 | `pp`, `vendas_resp`, `closer_mp_resp`, `mp_closer` | `filteredTermino` | Revenue/perdas por fechamento |
 
 ---
@@ -251,7 +280,14 @@ OK ROI = (Novas Vendas - Investimento) ÷ Investimento  ← Net ROI, NÃO bruto
 OK CURR = buildPeriodCurr quando isRange, blend single-month quando !isRange
 OK PREV = penúltimo mês blended (null se isRange ou período insuficiente)
 OK isRange = calculado no hook, propagado via tabProps — não recalcular nos tabs
+OK sdr_perdido = leads SDR criados no mês cuja Fase está em FASES_PERDIDO_SDR
+OK sdr_perdido + sdr_ativo + (Fase='Reunião Realizada') = leads_sdr  ← conferir a cada extract
+OK CPL = investimento ÷ leads criados, AMBOS do período de criação — ignora Data de Término
 ```
+
+**Referência SDR Jul/26** (validado contra pivot do Bitrix em 2026-08-03):
+- leads_sdr=150 · sdr_perdido=**103** · sdr_ativo=47
+- Composição: `Perdido - sem reunião` 87 + `Base de Oportunidade - Nutrição` 14 + `Parar promocoes` 1 + `Queria suporte` 1
 
 **Valores de referência Jan–Mar/26:**
 - Jan/26: leads≈188, qtd_v=9, rec_v=R$91.663, roi=11.9x
@@ -266,7 +302,7 @@ OK isRange = calculado no hook, propagado via tabProps — não recalcular nos t
 |-----------|-------|-----|
 | `ROI_TARGET` | `15` | Meta de ROI — linha de referência em gráficos e textos de alerta |
 | `CHART_OPACITY` | `{ active: 1, past: 0.45 }` | Opacidade de barras: mês atual vs anteriores |
-| `THR_PERDA_SDR` | `{ critical: 85, warn: 70 }` | Thresholds de taxa de perda SDR (Tab4) |
+| `THR_PERDA_SDR` | `{ critical: 95, warn: 85 }` | Thresholds de taxa de perda SDR (Tab4) — recalibrado 2026-08-03 sobre a distribuição real |
 | `ALERT_THR.roiCritical` | `8` | ROI < 8x dispara alerta vermelho |
 | `THR.roi` | `[15, 10]` | Semáforo de cor para ROI (verde/âmbar/vermelho) |
 | `FONTES_PAGAS` | Array | Fontes pagas — fonte da verdade: `Reports/FontesPagas.xlsx` (coluna "Fonte Paga?"="Sim"). Sincronizar com `extract.py` ao atualizar o Excel. |
@@ -353,4 +389,4 @@ Quando o usuário seleciona "Fontes Pagas", o array inclui `'__pagas__'`.
 
 ---
 
-*Última atualização: Jun/2026 | v4.1 — Filtro de Fonte (VLOOKUP + multi-select)*
+*Última atualização: Ago/2026 | v4.2 — Correção FASES_PERDIDO_SDR (etapas renomeadas no Bitrix) + CPL sempre por criação*

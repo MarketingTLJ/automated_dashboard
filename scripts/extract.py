@@ -32,8 +32,20 @@ FILE_LC           = REPORTS / "BASE LICENCAS TODA - 01.08.2026.xlsx"
 FILE_INV          = REPORTS / "INVESTIMENTOS.xlsx"
 FILE_FONTES_PAGAS = REPORTS / "FontesPagas.xlsx"
 
-# SDR phases treated as Perdido (phase names changed in new files)
-FASES_PERDIDO_SDR = {'Perdido', 'Nutrição', 'Base de Oportunidade - Nutrição', 'Parar promocoes'}
+# SDR phases treated as Perdido.
+# ATENÇÃO: os nomes das fases no Bitrix mudaram — 'Perdido' virou 'Perdido - sem reunião'
+# e surgiu 'Reunião realizada- Perdido' (sem espaço antes do hífen, grafia do Bitrix).
+# 'Perdido' e 'Nutrição' ficam por retrocompatibilidade com a safra de 2025.
+# Ao adicionar/renomear etapas no Bitrix, revalidar esta lista com scripts/inspect_excel.py.
+FASES_PERDIDO_SDR = {
+    'Perdido - sem reunião',            # fase atual de perda sem reunião
+    'Reunião realizada- Perdido',       # perda após reunião realizada
+    'Base de Oportunidade - Nutrição',
+    'Parar promocoes',
+    'Queria suporte',                   # lead de suporte, não é oportunidade
+    'Perdido',                          # legado 2025
+    'Nutrição',                         # legado 2025
+}
 
 # Licenças CS — fases de sucesso e churn
 FASES_LC_RENOVADO  = {'11 - Renovado'}

@@ -228,7 +228,13 @@ function buildPeriodCurr(filtered, filteredT, label) {
   const ticket = qtd_v > 0 ? +(rec_v / qtd_v).toFixed(0) : 0;
   const roi    = inv   > 0 ? +((rec_v - inv) / inv).toFixed(2) : 0;
   const cac    = qtd_v > 0 ? +(inv / qtd_v).toFixed(0) : 0;
-  const cpl    = leads_total > 0 ? +(inv / leads_total).toFixed(2) : 0;
+
+  // CPL é 100% por CRIAÇÃO: investimento e leads têm de vir do MESMO período de
+  // criação — não olha Data de Término (regra de negócio). Usar o `inv` do término
+  // aqui dividia, por exemplo, o investimento de 1 mês pelos leads de 6 meses.
+  // ROI/CAC/lucro_bruto continuam no término (receita é por data de fechamento).
+  const inv_criado = sumKey(filtered, 'inv');
+  const cpl = leads_total > 0 ? +(inv_criado / leads_total).toFixed(2) : 0;
 
   // ── Object fields ────────────────────────────────────────────────────────
   const fonte_sdr      = mergeKV(filtered, 'fonte_sdr');
@@ -326,9 +332,12 @@ export function useDerivedData(criadoStart, criadoEnd, terminoStart, terminoEnd,
 
   // ── Single-month blended CURR / PREV ────────────────────────────────────
   // Win/revenue fields that come from the termino period (single-month case)
+  // NOTA: 'cpl' NÃO entra aqui — CPL é investimento ÷ leads CRIADOS no mês,
+  // então vem sempre de DATA (criado), nunca de DATA_TERMINO. No DATA_TERMINO o
+  // campo `leads_sdr` guarda "SDR perdidos no mês", o que distorcia o denominador.
   const WIN_FIELDS = [
     'qtd_v','rec_v','qtd_i','rec_i','qtd_r','rec_r','ticket',
-    'roi','lucro_bruto','cac','cpl','inv','inv_breakdown',
+    'roi','lucro_bruto','cac','inv','inv_breakdown',
     'mp_closer','closer_mp_resp','vendas_resp','pp',
     // Licenças CS — indexadas por [LC] Data de vencimento
     'lc_total','lc_renovado','lc_cancelado','lc_aberto',

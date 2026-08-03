@@ -72,7 +72,14 @@ export const ROI_TARGET = 15;           // x — meta de ROI para linha de refer
 export const CHART_OPACITY = { active: 1, past: 0.45 };
 
 // ── SDR loss-rate thresholds (used in Tab4) ───────────────────────────────────
-export const THR_PERDA_SDR = { critical: 85, warn: 70 };  // %
+// Calibrado em 2026-08-03 sobre a distribuição real (últimos 6 meses, SDRs com ≥5 leads):
+// p25=63.6% · mediana=92.3% · p75=100%. A taxa global do time converge para 95-98%
+// em safras maduras, então 85/70 (calibração antiga, feita com o cálculo de perdidos
+// quebrado) marcava 63% dos SDRs de vermelho e não discriminava nada.
+// ⚠️ Viés de maturidade: meses recentes têm taxa menor só porque ainda há leads em
+// aberto (Jul/26: 68.7% com 47 leads abertos vs Jun/26: 97.8% com 8). Comparar SDRs
+// dentro do mesmo mês, não entre meses distantes.
+export const THR_PERDA_SDR = { critical: 95, warn: 85 };  // %
 
 // ── Licenças CS renewal-rate thresholds (used in Tab7) ───────────────────────
 export const THR_RENOVACAO = { good: 70, warn: 50 };  // % taxa de renovação
