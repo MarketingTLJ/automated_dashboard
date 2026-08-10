@@ -298,9 +298,16 @@ OK sdr_perdido + sdr_ativo + (Fase='Reunião Realizada') = leads_sdr  ← confer
 OK CPL = investimento ÷ leads criados, AMBOS do período de criação — ignora Data de Término
 ```
 
-**Referência SDR Jul/26** (validado contra pivot do Bitrix em 2026-08-03):
+**Referência SDR Jul/26** — snapshot de 2026-08-03, validado contra pivot do Bitrix:
 - leads_sdr=150 · sdr_perdido=**103** · sdr_ativo=47
 - Composição: `Perdido - sem reunião` 87 + `Base de Oportunidade - Nutrição` 14 + `Parar promocoes` 1 + `Queria suporte` 1
+
+> ⚠️ **Esses números mudam a cada extract e isso é esperado** — não é regressão.
+> Conforme os leads são trabalhados, `sdr_ativo` migra para `sdr_perdido` (ou para
+> `Reunião Realizada`), e o Bitrix também sofre limpezas retroativas. No update de
+> 2026-08-10 o mesmo Jul/26 passou a `leads_sdr=145 · sdr_perdido=128 · sdr_ativo=17`.
+> Safras antigas convergem para `sdr_ativo=0`. **Valide sempre a coerência interna**
+> (§8) em vez de comparar com números absolutos de extracts anteriores.
 
 **Valores de referência Jan–Mar/26:**
 - Jan/26: leads≈188, qtd_v=9, rec_v=R$91.663, roi=11.9x
