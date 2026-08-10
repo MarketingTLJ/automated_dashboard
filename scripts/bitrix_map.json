@@ -1,0 +1,108 @@
+{
+  "_nota": "Descoberto e validado em 2026-08-10 contra o portal tljmkt.bitrix24.com.br. Falta preencher 'fontes' e 'enums' (mecânico). Regerar com scripts/discover_fields.py sempre que criarem/renomearem campo ou etapa.",
+
+  "campos": {
+    "#TLJ# SDR": "UF_CRM_1731100890",
+    "[SDR] Motivo de perda": "UF_CRM_63DAB89F51656",
+    "É renovação?": "UF_CRM_1736878725444",
+    "[LC] Data de vencimento": "UF_CRM_43_1709127323",
+    "[LC] Motivo de perda": "UF_CRM_66E3304029CF4",
+    "[LC] Cliente está usando Bitrix?": "UF_CRM_1777929842107"
+  },
+
+  "_campos_nota": {
+    "Renda": "NÃO é campo customizado. É o padrão OPPORTUNITY. VALIDADO: soma dos ganhos do Closer fechados em Jan/26 = R$ 91.663,40 em 9 negócios, idêntico à referência do CLAUDE.md §8.",
+    "#TLJ# SDR": "Tipo 'employee' — devolve ID de usuário, não o nome. Precisa ser resolvido via user.get antes de comparar com a coluna 'Responsável', que é texto. O campo 'Renda lead' (UF_CRM_63DAB89E08851) existe mas é OUTRA COISA — não usar."
+  },
+
+  "campos_faltando": [],
+
+  "funis": {
+    "sdr": {
+      "category_id": 0,
+      "_nota": "Funil padrão do portal: os STAGE_ID vêm SEM prefixo 'C0:'.",
+      "canonico": {
+        "NEW": "Entrada",
+        "UC_6E7L5R": "Em conexão",
+        "UC_OY71AR": "Pré Qualificado",
+        "UC_UEQE59": "Conectado - Em atendimento",
+        "UC_SNVTFW": "Qualificado",
+        "PREPARATION": "Reunião agendada",
+        "UC_C0AX1E": "No-Show",
+        "UC_V7Y1YA": "Reagendado",
+        "WON": "Reunião Realizada",
+        "LOSE": "Perdido - sem reunião",
+        "UC_5CLVZR": "Reunião realizada- Perdido",
+        "UC_FRVY9N": "Base de Oportunidade - Nutrição",
+        "UC_1BBCZO": "Parar promocoes",
+        "1": "Queria suporte"
+      }
+    },
+    "closer": {
+      "category_id": 107,
+      "canonico": {
+        "C107:NEW": "Diagnóstico",
+        "C107:PREPARATION": "Reunião de Proposta",
+        "C107:UC_8BBDW9": "Re-Followup",
+        "C107:UC_5A99XQ": "Aguardando Aprovação Interna",
+        "C107:UC_OM2X4Y": "Reunião de fechamento",
+        "C107:UC_Z06KBP": "Promessa de Fechamento",
+        "C107:PREPAYMENT_INVOI": "Em assinatura CONTRATO",
+        "C107:EXECUTING": "Pago",
+        "C107:UC_TUQYNW": "Parar promoções",
+        "C107:WON": "Venda - Ganho",
+        "C107:LOSE": "Perdido"
+      }
+    },
+    "rent": {
+      "category_id": 103,
+      "_pendente": "Lista truncada na coleta — completar com discover_fields.py. Falta confirmar a etapa 'Proposta Perdida' de FASES_PERDIDO_RENT.",
+      "canonico": {
+        "C103:NEW": "1- Nova oportunidade",
+        "C103:UC_TUZ04B": "2- Reunião Agendada",
+        "C103:EXECUTING": "3 - Proposta enviada",
+        "C103:UC_38J1BM": "4 - Negociação Fecha este mês",
+        "C103:UC_OBIHP1": "5- Aguardando Aprovação Direção",
+        "C103:UC_501HI0": "6- Em assinatura/link enviado",
+        "C103:WON": "8 - Ganho",
+        "C103:LOSE": "Finalizado sem oportunidade de venda",
+        "C103:UC_6A3YS2": "Não Renovou a Licença",
+        "C103:UC_WG11JO": "Duplicados",
+        "C103:UC_C2LTXE": "Problema à Resolver CS"
+      }
+    },
+    "licencas": {
+      "category_id": 129,
+      "canonico": {
+        "C129:NEW": "1 - Checagem",
+        "C129:UC_N56XA0": "2 -Sem acesso Bitrix",
+        "C129:UC_ZZXMTD": "3 - Não esta usando",
+        "C129:PREPARATION": "4 - Esta usando",
+        "C129:UC_8DNOGX": "5 - Risco de Cancelamento",
+        "C129:UC_HTBTWZ": "6 - Pronto para renovar",
+        "C129:UC_1U7QPB": "6.5 - Sem Contato",
+        "C129:UC_DEL8HJ": "7 - Em tratativa",
+        "C129:FINAL_INVOICE": "8 - Renovado (Link enviado)",
+        "C129:UC_MAZS5N": "9- Aguardando pagamento",
+        "C129:WON": "11 - Renovado",
+        "C129:LOSE": "10 - Cancelado",
+        "C129:UC_UFUWO4": "12 - Renovado com concorrente",
+        "C129:UC_7XI32N": "13- Não está usando e não se adatpitou"
+      }
+    }
+  },
+
+  "enums": {},
+  "fontes": {},
+
+  "_volumes_2026_08_10": {
+    "sdr_0": 8552, "closer_107": 1153, "rent_103": 729, "licencas_129": 235,
+    "mineracao_135": 357, "licencas_novo_139": 1, "rent_inner_113": 174
+  },
+
+  "_escopo_decidido": {
+    "135_mineracao": "FORA. Tem 357 negócios no total mas ZERO criados em Jul/26 e apenas 5 em Jan/26 — incluir não aproxima os números de referência.",
+    "139_licencas_novo": "FORA. Só 1 negócio no portal inteiro.",
+    "113_rent_inner": "FORA por ora — 174 negócios; confirmar com o time se entra na base de Rentabilização."
+  }
+}
