@@ -84,25 +84,52 @@ def _url_csv(url: str) -> str:
     return f"https://docs.google.com/spreadsheets/d/{doc_id}/export?format=csv&gid={gid}"
 
 
-def _ler_sheet(url: str, nome: str) -> pd.DataFrame:
-    csv_url = _url_csv(url)
-    try:
-        df = pd.read_csv(csv_url)
-    except Exception as e:
-        raise SystemExit(
-            f"Não consegui ler a planilha de {nome}.\n"
-            f"  URL de exportação: {csv_url}\n"
-            f"  Erro: {e}\n\n"
-            "Causa mais comum: a planilha não está compartilhada publicamente.\n"
-            "Corrija em Compartilhar > Acesso geral > 'Qualquer pessoa com o link' (Leitor)."
-        ) from None
+def _ler_sheet(origem: str, nome: str) -> pd.DataFrame:
+    """
+    Lê a planilha de `origem`, que pode ser:
+      - uma URL do Google Sheets (precisa estar compartilhada com "qualquer
+        pessoa com o link"; a leitura é anônima, sem login); ou
+      - um caminho local .xlsx/.csv — útil para rodar na sua máquina antes de
+        resolver o compartilhamento, e como plano B se o Google sair do ar.
+    """
+    if not origem.lower().startswith("http"):
+        caminho = Path(origem)
+        if not caminho.is_absolute():
+            caminho = ROOT / origem
+        if not caminho.exists():
+            raise SystemExit(f"Arquivo de {nome} não encontrado: {caminho}")
+        df = (pd.read_csv(caminho) if caminho.suffix.lower() == ".csv"
+              else pd.read_excel(caminho))
+        print(f"    {nome}: lido de {caminho.name}")
+    else:
+        csv_url = _url_csv(origem)
+        try:
+            df = pd.read_csv(csv_url)
+        except Exception as e:
+            raise SystemExit(
+                f"Não consegui ler a planilha de {nome}.\n"
+                f"  URL de exportação: {csv_url}\n"
+                f"  Erro: {e}\n\n"
+                "Causa mais comum (HTTP 401/403): a planilha não está pública.\n"
+                "Corrija em Compartilhar > Acesso geral > 'Qualquer pessoa com o\n"
+                "link' (Leitor). Compartilhar só com o Grupo TLJ NÃO basta: a\n"
+                "leitura é anônima, sem sessão do Google.\n\n"
+                "Alternativa: aponte a variável para um arquivo local, ex.\n"
+                "  SHEET_INVESTIMENTOS_URL=Reports/INVESTIMENTOS.xlsx"
+            ) from None
+
     if df.empty:
         raise SystemExit(f"A planilha de {nome} voltou vazia — confira o gid na URL.")
     return df
 
 
 def _para_reais(serie: pd.Series) -> pd.Series:
-    """'R$ 1.234,56' -> 1234.56. A planilha é pt-BR; o CSV vem formatado."""
+    """
+    'R$ 1.234,56' -> 1234.56. O CSV do Google vem com o texto formatado em pt-BR;
+    o .xlsx local já vem numérico — nesse caso passa direto.
+    """
+    if pd.api.types.is_numeric_dtype(serie):
+        return serie
     return pd.to_numeric(
         serie.astype(str)
              .str.replace(r"[R$\s ]", "", regex=True)

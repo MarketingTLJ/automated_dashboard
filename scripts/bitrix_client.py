@@ -96,14 +96,21 @@ class BitrixClient:
 
     # ── leitura em massa ──────────────────────────────────────────────────
 
-    def list_all(self, method: str, params: dict | None = None, label: str = "") -> list:
+    def list_all(self, method: str, params: dict | None = None,
+                 label: str = "", por_id: bool = True) -> list:
         """
         Percorre todas as páginas de um método *.list.
 
-        Usa paginação por ID (start=-1) quando possível — o Bitrix pula o COUNT(*)
-        e a leitura fica ordens de grandeza mais rápida em bases grandes.
-        Cai para paginação por offset se o método não expõe ID.
+        por_id=True usa a paginação rápida do Bitrix (start=-1 + filtro '>ID'):
+        o portal pula o COUNT(*) e a leitura fica muito mais barata em bases
+        grandes. Só vale para métodos que aceitam filtro por ID — crm.deal.list
+        e crm.company.list. Para os demais (user.get, crm.deal.userfield.list),
+        use por_id=False: eles ignoram o filtro '>ID' e, se insistirmos,
+        devolvem sempre a mesma primeira página — laço infinito.
         """
+        if not por_id:
+            return self._list_all_offset(method, dict(params or {}, start=0), label)
+
         params = dict(params or {})
         base_filter = dict(params.get("filter") or {})
         params["order"] = {"ID": "ASC"}
@@ -117,12 +124,22 @@ class BitrixClient:
             batch = data.get("result") or []
             if not batch:
                 break
-            out.extend(batch)
             try:
-                last_id = max(int(r["ID"]) for r in batch)
+                novo_last = max(int(r["ID"]) for r in batch)
             except (KeyError, TypeError, ValueError):
-                # Método sem ID numérico — refaz com paginação por offset.
+                # Método sem ID numérico — recomeça por offset.
                 return self._list_all_offset(method, dict(params, start=0), label)
+
+            # Cinto de segurança: se o ID não avança, o filtro '>ID' está sendo
+            # ignorado e continuaríamos relendo a mesma página para sempre.
+            if novo_last <= last_id:
+                if self.verbose:
+                    print(f"    {label or method}: filtro por ID ignorado, "
+                          f"trocando para paginação por offset{' ' * 10}")
+                return self._list_all_offset(method, dict(params, start=0), label)
+
+            out.extend(batch)
+            last_id = novo_last
             if self.verbose:
                 print(f"    {label or method}: {len(out)} registros...", end="\r", flush=True)
             if len(batch) < self.PAGE_SIZE:
@@ -133,7 +150,8 @@ class BitrixClient:
         return out
 
     def _list_all_offset(self, method: str, params: dict, label: str = "") -> list:
-        out, start = [], 0
+        params = dict(params)
+        out, start, visto = [], 0, set()
         while True:
             data = self.call(method, dict(params, start=start))
             batch = data.get("result") or []
@@ -141,6 +159,13 @@ class BitrixClient:
             nxt = data.get("next")
             if nxt is None or not batch:
                 break
+            # Mesmo cinto de segurança do modo por ID: se o offset não avança,
+            # paramos em vez de reler a mesma página indefinidamente.
+            if nxt in visto or nxt <= start:
+                print(f"    AVISO: {method} não avançou a paginação em start={start}; "
+                      f"parando com {len(out)} registros.")
+                break
+            visto.add(nxt)
             start = nxt
         if self.verbose:
             print(f"    {label or method}: {len(out)} registros (offset)")
@@ -159,7 +184,7 @@ class BitrixClient:
     def users(self) -> dict:
         """{user_id: 'Nome Sobrenome'} — inclui usuários inativos (deals antigos)."""
         rows = self.list_all(
-            "user.get", {"ADMIN_MODE": "Y"}, label="usuários"
+            "user.get", {"ADMIN_MODE": "Y"}, label="usuários", por_id=False
         )
         out = {}
         for u in rows:
@@ -199,7 +224,8 @@ class BitrixClient:
         sai errado sem gerar erro nenhum.
         """
         rows = self.list_all(
-            "crm.deal.userfield.list", {"order": {"ID": "ASC"}}, label="campos custom"
+            "crm.deal.userfield.list", {"order": {"ID": "ASC"}},
+            label="campos custom", por_id=False
         )
         out = {}
         for f in rows:
