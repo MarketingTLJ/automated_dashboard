@@ -59,7 +59,7 @@ export const TABS = [
 // Sincronizar com extract.py ao atualizar FontesPagas.xlsx
 export const FONTES_PAGAS = [
   'Agendamento on-line', 'E-mail Marketing', 'Facebook Ads', 'Google Ads',
-  'JotForm', 'Linkedin', 'Nutrição', 'Redes sociais', 'Tiktok',
+  'JotForm', 'Linkedin', 'Nutrição', 'Redes sociais', 'Tiktok', 'Tiktok Ads',
   'Whatsapp API TLJ', 'Whatsapp Massivo API', 'Youtube', 'Youtube Ads',
 ];
 
