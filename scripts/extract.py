@@ -245,6 +245,10 @@ def _build_por_fonte(s, c, c_fechado, r_inc, r_ren):
         'qtd_r': 0, 'rec_r': 0.0,
         'sdr_ativo': 0, 'sdr_perdido': 0, 'descartados': 0,
         'sdr_resp': {}, 'sdr_mp_resp': {}, 'mp_sdr': {},
+        # Pipeline health do Closer por criação (aba Funil Comercial, V2)
+        'ganho': 0, 'perdido': 0, 'aberto': 0,
+        'valor_total_prop': 0.0, 'valor_aberto_prop': 0.0,
+        'valor_perdido_prop': 0.0, 'valor_ganho_prop': 0.0,
     }
     result = {}
 
@@ -298,7 +302,8 @@ def _build_por_fonte(s, c, c_fechado, r_inc, r_ren):
                     mp_resp[str(nome)] = _motivos(sub_p)
             result[f]['sdr_mp_resp'] = mp_resp
 
-    # Closer leads by fonte (criado)
+    # Closer leads by fonte (criado) — inclui pipeline health (ganho/perdido/aberto)
+    # e valor gerenciado em R$, para a aba Funil Comercial responder ao filtro de Fonte
     if 'Fonte' in c.columns:
         for fonte, grp in c.groupby(c['Fonte'].fillna('Não identificado')):
             f = _fname(fonte)
@@ -306,6 +311,19 @@ def _build_por_fonte(s, c, c_fechado, r_inc, r_ren):
             result[f]['leads_closer'] += len(grp)
             # perdas do Closer também contam para os descartados de leads efetivos
             result[f]['descartados']  += _descartados(grp[grp['Fase'] == 'Perdido'])
+
+            g_ganho    = _safe_int((grp['Fase'] == 'Venda - Ganho').sum())
+            g_perdido  = _safe_int((grp['Fase'] == 'Perdido').sum())
+            g_valor_total   = float(round(grp['Renda'].sum(), 2))
+            g_valor_ganho   = float(round(grp[grp['Fase']=='Venda - Ganho']['Renda'].sum(), 2))
+            g_valor_perdido = float(round(grp[grp['Fase']=='Perdido']['Renda'].sum(), 2))
+            result[f]['ganho']    += g_ganho
+            result[f]['perdido']  += g_perdido
+            result[f]['aberto']   += max(len(grp) - g_ganho - g_perdido, 0)
+            result[f]['valor_total_prop']   += g_valor_total
+            result[f]['valor_ganho_prop']   += g_valor_ganho
+            result[f]['valor_perdido_prop'] += g_valor_perdido
+            result[f]['valor_aberto_prop']  += round(max(g_valor_total - g_valor_ganho - g_valor_perdido, 0), 2)
 
     # Vendas fechadas by fonte
     if 'Fonte' in c_fechado.columns:

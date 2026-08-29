@@ -391,7 +391,7 @@ App.jsx [fonteFilter: string[]]
 Quando o usuário seleciona "Fontes Pagas", o array inclui `'__pagas__'`.
 `expandFontes()` no hook expande esse sentinela para todos os nomes em `FONTES_PAGAS`.
 
-### Escopo V2 (o que é filtrado) — atualizado 2026-08-03
+### Escopo V3 (o que é filtrado) — atualizado 2026-08-29
 - `leads_sdr`, `leads_closer`, `leads_total`, `reunioes`
 - `qtd_v`, `rec_v`, `qtd_i`, `rec_i`, `qtd_r`, `rec_r`
 - Derivados: `ticket`, `roi`, `cac`, `cpl`, `lucro_bruto`
@@ -399,9 +399,13 @@ Quando o usuário seleciona "Fontes Pagas", o array inclui `'__pagas__'`.
 - **Aba Análise SDR completa (V2):** `sdr_ativo`, `sdr_perdido`,
   `leads_efetivos`, `leads_descartados`, `sdr_resp` (tabela por responsável),
   `sdr_mp_resp` (drill-down de motivos) e `mp_sdr` (motivos gerais)
+- **Aba Funil Comercial completa (V3):** `ganho`, `perdido`, `aberto`, `taxa_fech`
+  (pipeline health do Closer por criação) e os 4 cards de valor —
+  `valor_total_prop` (Valor em Oportunidade), `valor_aberto_prop` (Valor em
+  Andamento), `valor_perdido_prop` (Valor Perdido), `valor_ganho_prop`
+  (não exibido — `rec_v`/Data de Fechamento é quem alimenta o card "Valor Ganho")
 
 ### O que ainda NÃO é filtrado (permanece total)
-- `ganho`, `perdido`, `aberto`, `taxa_fech` (funil Closer, não quebrado por fonte)
 - `closer_resp`, `vendas_resp`, `pp` (abas Closers e Propostas Perdidas)
 - `inv` (investimento não é rastreado por fonte)
 
@@ -528,4 +532,4 @@ lista muda no `extract.py`. Nunca duplicar essa lista no front.
 
 ---
 
-*Última atualização: Ago/2026 | v4.5 — Filtro de Fonte V2: cobre toda a aba Análise SDR (§12)*
+*Última atualização: Ago/2026 | v4.6 — Filtro de Fonte V3: cobre pipeline health + valor gerenciado da aba Funil Comercial (§12)*

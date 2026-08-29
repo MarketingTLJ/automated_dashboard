@@ -157,6 +157,9 @@ function applyFonteFilter(monthData, expandedFontes) {
   let qtd_i = 0, rec_i = 0;
   let qtd_r = 0, rec_r = 0;
   let sdr_ativo = 0, sdr_perdido = 0, leads_descartados = 0;
+  // Pipeline health do Closer por criação (aba Funil Comercial, V2)
+  let ganho = 0, perdido = 0, aberto = 0;
+  let valor_total_prop = 0, valor_aberto_prop = 0, valor_perdido_prop = 0, valor_ganho_prop = 0;
 
   // Estruturas da aba SDR, mescladas entre as fontes selecionadas
   const sdr_resp    = {};   // { nome: { total, conv_closer, perdido } }
@@ -177,6 +180,13 @@ function applyFonteFilter(monthData, expandedFontes) {
     sdr_ativo         += d.sdr_ativo   || 0;
     sdr_perdido       += d.sdr_perdido || 0;
     leads_descartados += d.descartados || 0;
+    ganho    += d.ganho    || 0;
+    perdido  += d.perdido  || 0;
+    aberto   += d.aberto   || 0;
+    valor_total_prop   += d.valor_total_prop   || 0;
+    valor_aberto_prop  += d.valor_aberto_prop  || 0;
+    valor_perdido_prop += d.valor_perdido_prop || 0;
+    valor_ganho_prop    += d.valor_ganho_prop   || 0;
 
     Object.entries(d.sdr_resp || {}).forEach(([nome, st]) => {
       if (!sdr_resp[nome]) sdr_resp[nome] = { total: 0, conv_closer: 0, perdido: 0 };
@@ -205,6 +215,7 @@ function applyFonteFilter(monthData, expandedFontes) {
   const lucro_bruto = +(rec_v - inv).toFixed(2);
   const cac         = qtd_v > 0  ? +(inv / qtd_v).toFixed(0)               : 0;
   const cpl         = leads_total > 0 ? +(inv / leads_total).toFixed(2)    : 0;
+  const taxa_fech   = (ganho + perdido) > 0 ? +((ganho / (ganho + perdido)) * 100).toFixed(1) : 0;
 
   // Filter fonte_sdr to only selected fontes
   const fonte_sdr = {};
@@ -221,6 +232,8 @@ function applyFonteFilter(monthData, expandedFontes) {
     sdr_ativo, sdr_perdido,
     sdr_resp, sdr_mp_resp, mp_sdr,
     qtd_v, rec_v, qtd_i, rec_i, qtd_r, rec_r,
+    ganho, perdido, aberto, taxa_fech,
+    valor_total_prop, valor_aberto_prop, valor_perdido_prop, valor_ganho_prop,
     ticket, roi, lucro_bruto, cac, cpl, inv,
     fonte_sdr,
   };
@@ -252,6 +265,12 @@ function buildPeriodCurr(filtered, filteredT, label) {
   const aberto_c  = sumKey(filtered, 'aberto');
   const taxa_fech_c = (ganho_c + perdido_c) > 0
     ? +((ganho_c / (ganho_c + perdido_c)) * 100).toFixed(1) : 0;
+  // Valor em R$ do pipeline Closer, mesma safra do ganho_c/perdido_c/aberto_c acima —
+  // usado nos cards "Valor em Oportunidade/Andamento/Perdido" da aba Funil Comercial.
+  const valor_total_prop   = sumKey(filtered, 'valor_total_prop');
+  const valor_aberto_prop  = sumKey(filtered, 'valor_aberto_prop');
+  const valor_perdido_prop = sumKey(filtered, 'valor_perdido_prop');
+  const valor_ganho_prop   = sumKey(filtered, 'valor_ganho_prop');
 
   // ── Termino-indexed scalars ──────────────────────────────────────────────
   const src = filteredT.length ? filteredT : filtered;
@@ -308,6 +327,7 @@ function buildPeriodCurr(filtered, filteredT, label) {
     leads_sdr, leads_closer, leads_total, reunioes, sdr_perdido, sdr_ativo,
     leads_efetivos, leads_descartados,
     ganho: ganho_c, perdido: perdido_c, aberto: aberto_c, taxa_fech: taxa_fech_c,
+    valor_total_prop, valor_aberto_prop, valor_perdido_prop, valor_ganho_prop,
     qtd_v, rec_v, qtd_i, rec_i, qtd_r, rec_r, ticket,
     inv, lucro_bruto, roi, cac, cpl,
     fonte_sdr, mp_sdr, mp_closer, inv_breakdown,

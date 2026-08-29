@@ -2,14 +2,24 @@
 import { FunnelBars } from '../components/charts/FunnelBars.jsx';
 import { WinLossBar } from '../components/charts/WinLossBar.jsx';
 import { DeltaBadge } from '../components/ui/DeltaBadge.jsx';
-import { scl, sclCls, pct } from '../utils/formatters.js';
-import { THR } from '../constants/index.js';
+import { fmt, scl, sclCls, pct } from '../utils/formatters.js';
+import { THR, COLORS } from '../constants/index.js';
 
 const STAGES = [
   { key: 'leads', label: '1. Leads Gerados',     color: '#3374B5', icon: '📥', note: 'SDR + Closer criados' },
   { key: 'reunioes', label: '2. Reuniões',        color: '#2563eb', icon: '📅', note: '= Leads criados no Closer' },
   { key: 'pipeline', label: '3. Pipeline Closer', color: '#0e7490', icon: '💼', note: 'Em negociação' },
   { key: 'vendas', label: '4. Vendas Fechadas',   color: '#22c55e', icon: '✅', note: 'Contratos assinados' },
+];
+
+// Cards de valor (R$) — mesma safra "Criado no mês" das 3 primeiras (pipeline
+// Closer), exceto Valor Ganho, que usa Data de Fechamento (mesma base do card
+// "4. Vendas Fechadas" acima).
+const VALUE_CARDS = [
+  { key: 'valor_total_prop',   label: 'Valor em Oportunidade', color: COLORS.brandBlue,      icon: '📦', note: 'Todos os negócios do pipeline' },
+  { key: 'valor_aberto_prop',  label: 'Valor em Andamento',    color: COLORS.aberto,          icon: '⏳', note: 'Negócios ainda em aberto' },
+  { key: 'valor_perdido_prop', label: 'Valor Perdido',         color: COLORS.perdido,         icon: '🔻', note: 'Negócios perdidos' },
+  { key: 'rec_v',              label: 'Valor Ganho',           color: COLORS.ganho,           icon: '💰', note: 'Vendas fechadas · Data de Fechamento' },
 ];
 
 export function Tab2_FunilComercial({ CURR, PREV, trend6, N6, filtered, isRange }) {
@@ -60,6 +70,18 @@ export function Tab2_FunilComercial({ CURR, PREV, trend6, N6, filtered, isRange 
               </div>
             );
           })}
+        </div>
+
+        {/* Value cards — R$ por status do pipeline Closer */}
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-6">
+          {VALUE_CARDS.map(c => (
+            <div key={c.key} className="rounded-xl border border-gray-100 bg-white/60 p-4" style={{ background: `${c.color}08` }}>
+              <span className="text-2xl">{c.icon}</span>
+              <p className="text-gray-600 text-xs mt-2 mb-1 leading-tight">{c.label}</p>
+              <p className="text-2xl font-black mb-1" style={{ color: c.color }}>{fmt(CURR[c.key] ?? 0)}</p>
+              <p className="text-gray-600 text-xs mt-1">{c.note}</p>
+            </div>
+          ))}
         </div>
 
         {/* SDR breakdown */}
