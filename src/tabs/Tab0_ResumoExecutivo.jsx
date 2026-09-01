@@ -20,6 +20,9 @@ export function Tab0_ResumoExecutivo({
   const ftList = filteredTermino?.length ? filteredTermino : filtered;
 
   const periodLeads = filtered.reduce((s, d) => s + d.leads_total, 0);
+  // Leads efetivos e propostas seguem o filtro "Criado em", como o total de leads
+  const periodEfetivos  = filtered.reduce((s, d) => s + (d.leads_efetivos ?? 0), 0);
+  const periodPropostas = filtered.reduce((s, d) => s + d.leads_closer, 0);
   const periodSales = ftList.reduce((s, d) => s + d.qtd_v, 0);
   const periodRecV  = ftList.reduce((s, d) => s + d.rec_v, 0);
   const periodRec   = ftList.reduce((s, d) => s + (d.rec_v + d.rec_i + d.rec_r), 0);
@@ -35,6 +38,8 @@ export function Tab0_ResumoExecutivo({
   const kpis = isRange
     ? [
         { lb: 'Total Leads',        v: periodLeads,            num: true },
+        { lb: 'Total Leads Efetivos', v: periodEfetivos,  num: true, note: 'Oportunidades reais' },
+        { lb: 'Total Propostas',    v: periodPropostas,   num: true, note: 'Leads no Closer' },
         { lb: 'Contratos',          v: periodSales,            num: true },
         {
           lb: 'Taxa Conv. Geral',   v: taxaGeralPer + '%',
@@ -49,6 +54,16 @@ export function Tab0_ResumoExecutivo({
       ]
     : [
         { lb: 'Total Leads',        v: CURR.leads_total,   c: CURR.leads_total,   p: PREV?.leads_total },
+        {
+          lb: 'Total Leads Efetivos', v: CURR.leads_efetivos,
+          c: CURR.leads_efetivos, p: PREV?.leads_efetivos,
+          note: 'Oportunidades reais',
+        },
+        {
+          lb: 'Total Propostas',    v: CURR.leads_closer,
+          c: CURR.leads_closer, p: PREV?.leads_closer,
+          note: 'Leads no Closer',
+        },
         { lb: 'Contratos',          v: CURR.qtd_v,         c: CURR.qtd_v,         p: PREV?.qtd_v },
         {
           lb: 'Taxa Conv. Geral',   v: taxaGeralCurr + '%',
@@ -130,14 +145,16 @@ export function Tab0_ResumoExecutivo({
             </div>
           </div>
 
-          {/* KPI grid */}
-          <div className="grid grid-cols-2 md:grid-cols-5 gap-3">
+          {/* KPI grid — 7 indicadores: 2 col (mobile) → 4 (md) → 7 (lg) */}
+          <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-7 gap-3">
             {kpis.map((k, i) => (
               <div key={i} className="bg-white/8 border border-white/12 rounded-xl p-4 backdrop-blur-sm">
                 <p className="text-blue-200/70 text-xs uppercase tracking-wider mb-1">{k.lb}</p>
                 {k.note && <p className="text-blue-200/40 text-xs mb-1">{k.note}</p>}
                 <p
-                  className={`text-2xl font-black ${k.warn ? 'text-red-400' : k.hi ? 'text-green-400' : 'text-white'}`}
+                  className={`text-2xl lg:text-xl xl:text-2xl font-black whitespace-nowrap ${
+                    k.warn ? 'text-red-400' : k.hi ? 'text-green-400' : 'text-white'
+                  }`}
                   style={k.clr ? { color: k.clr } : {}}
                 >
                   {k.v}
@@ -153,8 +170,10 @@ export function Tab0_ResumoExecutivo({
           </div>
 
           <div className="mt-4 p-3 rounded-xl bg-white/8 border border-white/10">
-            <p className="text-blue-200/60 text-xs">
-              ℹ️ <strong className="text-white">Taxa Conv. Geral</strong> = Vendas fechadas ÷ Total Leads gerados.&nbsp;|&nbsp;
+            <p className="text-blue-200/60 text-xs leading-relaxed">
+              ℹ️ <strong className="text-white">Leads Efetivos</strong> = Total de Leads − perdas que nunca foram oportunidade (duplicata, teste, dado inválido, nunca respondeu).&nbsp;|&nbsp;
+              <strong className="text-white">Propostas</strong> = leads criados no Closer.&nbsp;|&nbsp;
+              <strong className="text-white">Taxa Conv. Geral</strong> = Vendas fechadas ÷ Total Leads gerados.&nbsp;|&nbsp;
               <strong className="text-white">Taxa Fech. Closer</strong> = Ganhos ÷ (Ganhos + Perdidos) — eficiência operacional.
             </p>
           </div>
