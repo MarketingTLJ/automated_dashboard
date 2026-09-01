@@ -505,15 +505,22 @@ leads_descartados = perdas (SDR + Closer) cujo `[SDR] Motivo de perda`
                     está em MOTIVOS_NAO_EFETIVOS
 ```
 
-**`MOTIVOS_NAO_EFETIVOS`** (em `extract.py`, exportado para `data.js`):
-`Card Duplicado` · `Testes` · `Dados incorretos/ Impossível contato`
+**`MOTIVOS_NAO_EFETIVOS`** (em `extract.py`, exportado para `data.js`) — 4 motivos desde 2026-09-01:
+`Card Duplicado` · `Testes` · `Dados incorretos/ Impossível contato` · `Sem Contato / Nunca respondeu!`
 
-> `Sem Contato / Sem Resposta` **não** entra: o lead existe e é real, apenas não respondeu —
-> continua sendo uma oportunidade perdida legítima (decisão do usuário em 2026-08-03).
+> 📌 **Histórico da regra.** Em 2026-08-03 o usuário mandou **retirar** `Sem Contato / Sem Resposta`
+> (o lead é real, apenas não respondeu). Em 2026-09-01 decidiu **reincluir** esse mesmo motivo,
+> que nesse meio-tempo o Bitrix renomeou para `Sem Contato / Nunca respondeu!`. O rename foi
+> **retroativo** — a grafia antiga não existe mais em nenhum registro da base, então não há
+> duas grafias convivendo.
 
-> ⚠️ Grafia validada contra as bases em 2026-08-03. Se um motivo for renomeado no Bitrix,
-> ele deixa de ser descontado **silenciosamente** — o número apenas sobe, sem erro.
-> Revalidar junto com `FASES_PERDIDO_SDR`.
+> ⚠️ **Não confundir** `Sem Contato / Nunca respondeu!` (descartado — nunca houve contato) com
+> `Sem contato/ Cliente não retorna mais` (**não** descartado — houve contato e depois o cliente
+> sumiu). São motivos distintos e o segundo é oportunidade real.
+
+> ⚠️ Grafia revalidada contra as bases em 2026-09-01. Se um motivo for renomeado no Bitrix,
+> ele deixa de ser descontado **silenciosamente** — o número de efetivos apenas sobe, sem erro.
+> Revalidar junto com `FASES_PERDIDO_SDR` a cada update.
 
 ### Por que não é uma soma de parcelas
 A formulação original era *"Em Andamento SDR + Leads em Closer + Perdidos em Closer ou SDR
@@ -527,9 +534,13 @@ Aba 5 (`Tab4_AnaliseSdr.jsx`) — 2º card da linha de KPIs, mais a nota explica
 A nota lê `MOTIVOS_NAO_EFETIVOS` de `data.js`, então **o texto se atualiza sozinho** quando a
 lista muda no `extract.py`. Nunca duplicar essa lista no front.
 
-**Referência Jul/26:** 178 gerados − 22 descartados = **156 efetivos (87,6%)**
-(descartados: Card Duplicado 9 + Testes 8 + Dados incorretos 5)
+**Referência Ago/26** (com os 4 motivos): 236 gerados − 81 descartados = **155 efetivos (65,7%)**
+(descartados no SDR: Sem Contato / Nunca respondeu! 38 + Card Duplicado 31 + Dados incorretos 7
++ Testes 5; nenhum no Closer)
+
+> A inclusão do 4º motivo derrubou a taxa de efetividade de ~85% para ~47-66%, porque
+> `Sem Contato / Nunca respondeu!` é o motivo de perda mais volumoso da base (1.152 no SDR).
 
 ---
 
-*Última atualização: Ago/2026 | v4.6 — Filtro de Fonte V3: cobre pipeline health + valor gerenciado da aba Funil Comercial (§12)*
+*Última atualização: Set/2026 | v4.7 — Leads Efetivos: 4º motivo `Sem Contato / Nunca respondeu!` (§14)*

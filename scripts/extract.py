@@ -55,6 +55,8 @@ MOTIVOS_NAO_EFETIVOS = {
     'Card Duplicado',
     'Testes',
     'Dados incorretos/ Impossível contato',
+    'Sem Contato / Nunca respondeu!',   # nome atual; o Bitrix renomeou
+                                        # 'Sem Contato / Sem Resposta' (rename retroativo)
 }
 
 # Licenças CS — fases de sucesso e churn
