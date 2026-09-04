@@ -1,5 +1,6 @@
 import { DeltaBadge } from '../components/ui/DeltaBadge.jsx';
 import { AlertBanner } from '../components/ui/AlertBanner.jsx';
+import { InvestmentTable } from '../components/ui/InvestmentTable.jsx';
 import { RevenueStackedBar } from '../components/charts/RevenueStackedBar.jsx';
 import { ConversionRateBar } from '../components/charts/ConversionRateBar.jsx';
 import { RevenueInvestmentTrend } from '../components/charts/RevenueInvestmentTrend.jsx';
@@ -8,7 +9,7 @@ import { generateAlerts } from '../utils/alertEngine.js';
 import { THR } from '../constants/index.js';
 
 export function Tab0_ResumoExecutivo({
-  CURR, PREV, trend6, N6,
+  CURR, PREV, trend6, N6, last6,
   investRevenueVendas, investRevenueVendasInc,
   investRevenueVendasPrevYear, investRevenueVendasIncPrevYear,
   filtered, filteredTermino, isRange,
@@ -178,6 +179,11 @@ export function Tab0_ResumoExecutivo({
             </p>
           </div>
         </div>
+      </div>
+
+      {/* Tabela de Investimentos */}
+      <div className="mb-7">
+        <InvestmentTable last6={last6} />
       </div>
 
       {/* Period summary cards — shown only in range mode */}

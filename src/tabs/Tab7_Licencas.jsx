@@ -1,3 +1,4 @@
+import { useState, Fragment } from 'react';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Cell, Legend } from 'recharts';
 import { SectionHeader } from '../components/ui/SectionHeader.jsx';
 import { KpiCard } from '../components/ui/KpiCard.jsx';
@@ -12,6 +13,8 @@ function taxaColor(taxa) {
 }
 
 export function Tab7_Licencas({ CURR, PREV, filteredTermino, isRange }) {
+  const [selRen, setSelRen] = useState(null);
+  const [selCan, setSelCan] = useState(null);
   if (!CURR) return null;
 
   const lc_total      = CURR.lc_total      || 0;
@@ -205,9 +208,10 @@ export function Tab7_Licencas({ CURR, PREV, filteredTermino, isRange }) {
           {/* ── Por Responsável CS ──────────────────────────────────────── */}
           {respArr.length > 0 && (
             <div className="glass-card rounded-2xl p-5 mb-7">
-              <p className="text-gray-700 text-xs uppercase tracking-widest font-semibold mb-4">
+              <p className="text-gray-700 text-xs uppercase tracking-widest font-semibold mb-1">
                 Performance por Responsável CS
               </p>
+              <p className="text-gray-500 text-xs mb-4">👆 Clique em Renovadas ou Canceladas para ver os negócios</p>
               <div className="overflow-x-auto">
                 <table className="w-full text-sm">
                   <thead>
@@ -222,25 +226,107 @@ export function Tab7_Licencas({ CURR, PREV, filteredTermino, isRange }) {
                     </tr>
                   </thead>
                   <tbody>
-                    {respArr.map(({ nome, total, renovado, cancelado, aberto, rec_renovado }) => {
+                    {respArr.map(({ nome, total, renovado, cancelado, aberto, rec_renovado, renovado_detalhe, cancelado_detalhe }) => {
                       const taxa = (renovado + cancelado) > 0
                         ? ((renovado / (renovado + cancelado)) * 100).toFixed(0)
                         : '—';
-                      const cor  = typeof taxa === 'string' ? COLORS.muted : taxaColor(Number(taxa));
+                      const cor = typeof taxa === 'string' ? COLORS.muted : taxaColor(Number(taxa));
+                      const renDetalhe = renovado_detalhe || [];
+                      const canDetalhe = cancelado_detalhe || [];
+                      const isRenOpen = selRen === nome;
+                      const isCanOpen = selCan === nome;
                       return (
-                        <tr key={nome} className="border-b border-gray-100 hover:bg-gray-50 transition-colors">
-                          <td className="py-2.5 pr-4 font-medium text-gray-700">{nome}</td>
-                          <td className="text-center py-2.5 px-3 text-gray-600">{total}</td>
-                          <td className="text-center py-2.5 px-3 font-semibold" style={{ color: COLORS.lcRenovado }}>{renovado}</td>
-                          <td className="text-center py-2.5 px-3 font-semibold" style={{ color: COLORS.lcCancelado }}>{cancelado}</td>
-                          <td className="text-center py-2.5 px-3 text-gray-500">{aberto}</td>
-                          <td className="text-center py-2.5 px-3 font-bold" style={{ color: cor }}>
-                            {typeof taxa === 'string' ? taxa : `${taxa}%`}
-                          </td>
-                          <td className="text-right py-2.5 pl-3 font-semibold" style={{ color: COLORS.lcRenovado }}>
-                            {rec_renovado > 0 ? fmtK(rec_renovado) : '—'}
-                          </td>
-                        </tr>
+                        <Fragment key={nome}>
+                          <tr className="border-b border-gray-100 hover:bg-gray-50 transition-colors">
+                            <td className="py-2.5 pr-4 font-medium text-gray-700">{nome}</td>
+                            <td className="text-center py-2.5 px-3 text-gray-600">{total}</td>
+                            <td
+                              className={`text-center py-2.5 px-3 font-semibold ${renovado > 0 ? 'cursor-pointer hover:underline' : ''}`}
+                              style={{ color: COLORS.lcRenovado }}
+                              onClick={() => renovado > 0 && setSelRen(isRenOpen ? null : nome)}
+                            >
+                              {renovado}{renovado > 0 ? (isRenOpen ? ' ▲' : ' ▼') : ''}
+                            </td>
+                            <td
+                              className={`text-center py-2.5 px-3 font-semibold ${cancelado > 0 ? 'cursor-pointer hover:underline' : ''}`}
+                              style={{ color: COLORS.lcCancelado }}
+                              onClick={() => cancelado > 0 && setSelCan(isCanOpen ? null : nome)}
+                            >
+                              {cancelado}{cancelado > 0 ? (isCanOpen ? ' ▲' : ' ▼') : ''}
+                            </td>
+                            <td className="text-center py-2.5 px-3 text-gray-500">{aberto}</td>
+                            <td className="text-center py-2.5 px-3 font-bold" style={{ color: cor }}>
+                              {typeof taxa === 'string' ? taxa : `${taxa}%`}
+                            </td>
+                            <td className="text-right py-2.5 pl-3 font-semibold" style={{ color: COLORS.lcRenovado }}>
+                              {rec_renovado > 0 ? fmtK(rec_renovado) : '—'}
+                            </td>
+                          </tr>
+                          {isRenOpen && (
+                            <tr className="bg-emerald-500/5 border-b border-emerald-500/20">
+                              <td colSpan={7} className="p-0">
+                                <div className="px-5 pb-4 pt-2">
+                                  <p className="text-xs font-semibold uppercase tracking-wider mb-2" style={{ color: COLORS.lcRenovado }}>
+                                    Licenças Renovadas — {nome} ({renDetalhe.length})
+                                  </p>
+                                  <div className="overflow-auto">
+                                    <table className="w-full text-xs">
+                                      <thead>
+                                        <tr className="text-gray-500 uppercase tracking-wider">
+                                          <th className="py-2 pr-4 text-left">ID</th>
+                                          <th className="py-2 pr-4 text-left">Nome do Negócio</th>
+                                          <th className="py-2 pr-4 text-right">Valor</th>
+                                        </tr>
+                                      </thead>
+                                      <tbody>
+                                        {renDetalhe.map(v => (
+                                          <tr key={v.id} className="border-t border-gray-100">
+                                            <td className="py-2 pr-4 text-gray-500">{v.id}</td>
+                                            <td className="py-2 pr-4 text-gray-800 max-w-xs truncate" title={v.nome}>{v.nome}</td>
+                                            <td className="py-2 pr-4 text-right font-mono" style={{ color: COLORS.lcRenovado }}>{fmt(v.valor)}</td>
+                                          </tr>
+                                        ))}
+                                      </tbody>
+                                    </table>
+                                  </div>
+                                </div>
+                              </td>
+                            </tr>
+                          )}
+                          {isCanOpen && (
+                            <tr className="bg-red-500/5 border-b border-red-500/20">
+                              <td colSpan={7} className="p-0">
+                                <div className="px-5 pb-4 pt-2">
+                                  <p className="text-xs font-semibold uppercase tracking-wider mb-2" style={{ color: COLORS.lcCancelado }}>
+                                    Licenças Canceladas — {nome} ({canDetalhe.length})
+                                  </p>
+                                  <div className="overflow-auto">
+                                    <table className="w-full text-xs">
+                                      <thead>
+                                        <tr className="text-gray-500 uppercase tracking-wider">
+                                          <th className="py-2 pr-4 text-left">ID</th>
+                                          <th className="py-2 pr-4 text-left">Nome do Negócio</th>
+                                          <th className="py-2 pr-4 text-left">Motivo de Perda</th>
+                                          <th className="py-2 pr-4 text-right">Valor</th>
+                                        </tr>
+                                      </thead>
+                                      <tbody>
+                                        {canDetalhe.map(v => (
+                                          <tr key={v.id} className="border-t border-gray-100">
+                                            <td className="py-2 pr-4 text-gray-500">{v.id}</td>
+                                            <td className="py-2 pr-4 text-gray-800 max-w-xs truncate" title={v.nome}>{v.nome}</td>
+                                            <td className="py-2 pr-4 text-gray-600">{v.motivo || '—'}</td>
+                                            <td className="py-2 pr-4 text-right font-mono" style={{ color: COLORS.lcCancelado }}>{fmt(v.valor)}</td>
+                                          </tr>
+                                        ))}
+                                      </tbody>
+                                    </table>
+                                  </div>
+                                </div>
+                              </td>
+                            </tr>
+                          )}
+                        </Fragment>
                       );
                     })}
                   </tbody>

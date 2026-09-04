@@ -371,18 +371,35 @@ def _build_lc_fields(lics, y, m):
     lc_taxa       = round(lc_renovado / (lc_renovado + lc_cancelado) * 100, 1) \
                     if (lc_renovado + lc_cancelado) > 0 else 0.0
 
-    # Por responsável CS
+    motivo_col = '[LC] Motivo de perda'
+
+    def _deal_dict(row, with_motivo=False):
+        d = {
+            'id':    str(row['ID']) if pd.notna(row['ID']) else '',
+            'nome':  str(row['Nome do negócio']) if pd.notna(row['Nome do negócio']) else '',
+            'valor': float(round(row['Renda'], 2)) if pd.notna(row['Renda']) else 0.0,
+        }
+        if with_motivo:
+            d['motivo'] = str(row[motivo_col]) if motivo_col in lc.columns and pd.notna(row.get(motivo_col)) else ''
+        return d
+
+    # Por responsável CS — inclui o detalhamento negócio a negócio (drill-down
+    # da Tabela Performance por Responsável CS: clique em Renovadas/Canceladas)
     lc_resp = {}
     for nome in lc['Responsável'].dropna().unique():
         sub    = lc[lc['Responsável'] == nome]
         r_mask = sub['Fase'].isin(FASES_LC_RENOVADO)
         c_mask = sub['Fase'].isin(FASES_LC_CANCELADO)
+        ren_sub = sub[r_mask]
+        can_sub = sub[c_mask]
         lc_resp[str(nome)] = {
             'total':        len(sub),
             'renovado':     int(r_mask.sum()),
             'cancelado':    int(c_mask.sum()),
             'aberto':       max(int(len(sub) - r_mask.sum() - c_mask.sum()), 0),
-            'rec_renovado': float(round(sub[r_mask]['Renda'].sum(), 2)),
+            'rec_renovado': float(round(ren_sub['Renda'].sum(), 2)),
+            'renovado_detalhe':  [_deal_dict(row) for _, row in ren_sub.iterrows()],
+            'cancelado_detalhe': [_deal_dict(row, with_motivo=True) for _, row in can_sub.iterrows()],
         }
 
     # Distribuição de uso do Bitrix
@@ -393,7 +410,6 @@ def _build_lc_fields(lics, y, m):
                          for k, v in lc[bitrix_col].value_counts().head(6).items()}
 
     # Motivos de churn
-    motivo_col = '[LC] Motivo de perda'
     lc_motivos_churn = {}
     if motivo_col in can.columns and len(can) > 0:
         lc_motivos_churn = {str(k): int(v)
@@ -465,6 +481,18 @@ def build_month(ym, label, sdr, closer, rent, lics, inv_map, inv_breakdown):
     rec_v  = float(round(c_fechado['Renda'].sum(), 2))
     qtd_v  = len(c_fechado)
     ticket = round(rec_v / qtd_v, 2) if qtd_v > 0 else 0.0
+
+    # Lista de vendas do mês (drill-down da Tabela de Investimentos)
+    vendas_detalhe = [
+        {
+            'id':          str(row['ID']) if pd.notna(row['ID']) else '',
+            'nome':        str(row['Nome do negócio']) if pd.notna(row['Nome do negócio']) else '',
+            'fonte':       str(row['Fonte']).strip() if pd.notna(row['Fonte']) else 'Não identificado',
+            'responsavel': str(row['Responsável']) if pd.notna(row['Responsável']) else '',
+            'valor':       float(round(row['Renda'], 2)) if pd.notna(row['Renda']) else 0.0,
+        }
+        for _, row in c_fechado.iterrows()
+    ]
 
     # ─── INCREMENTOS/RENOVAÇÕES: ganhos por Data de fechamento ───────────────
     r_fechado = rent[
@@ -612,6 +640,7 @@ def build_month(ym, label, sdr, closer, rent, lics, inv_map, inv_breakdown):
         'sdr_resp':     sdr_resp,
         'closer_resp':  closer_resp,
         'vendas_resp':  vendas_resp,
+        'vendas_detalhe': vendas_detalhe,
         'sdr_to_closer': sdr_to_closer,
         'sdr_mp_resp':  sdr_mp,
         'closer_mp_resp': closer_mp,

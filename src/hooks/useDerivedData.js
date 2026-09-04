@@ -28,6 +28,30 @@ function mergeNested(arr, field, subKeys) {
   }, {});
 }
 
+// Merge lc_resp across months: sums the numeric stats and concatenates the
+// per-deal drill-down lists (renovado_detalhe/cancelado_detalhe) — mergeNested
+// can't be reused here since those two fields are arrays, not numbers.
+function mergeLcResp(arr) {
+  return arr.reduce((acc, d) => {
+    Object.entries(d.lc_resp || {}).forEach(([nome, s]) => {
+      if (!acc[nome]) {
+        acc[nome] = {
+          total: 0, renovado: 0, cancelado: 0, aberto: 0, rec_renovado: 0,
+          renovado_detalhe: [], cancelado_detalhe: [],
+        };
+      }
+      acc[nome].total        += s.total        || 0;
+      acc[nome].renovado     += s.renovado     || 0;
+      acc[nome].cancelado    += s.cancelado    || 0;
+      acc[nome].aberto       += s.aberto       || 0;
+      acc[nome].rec_renovado += s.rec_renovado || 0;
+      acc[nome].renovado_detalhe  = acc[nome].renovado_detalhe.concat(s.renovado_detalhe   || []);
+      acc[nome].cancelado_detalhe = acc[nome].cancelado_detalhe.concat(s.cancelado_detalhe  || []);
+    });
+    return acc;
+  }, {});
+}
+
 // Merge { name: { motivo: count } } (e.g. sdr_mp_resp, closer_mp_resp)
 function mergeNestedKV(arr, field) {
   return arr.reduce((acc, d) => {
@@ -317,7 +341,7 @@ function buildPeriodCurr(filtered, filteredT, label) {
   const lc_rec_cancelado  = sumKey(src, 'lc_rec_cancelado');
   const lc_taxa_renovacao = (lc_renovado + lc_cancelado) > 0
     ? +((lc_renovado / (lc_renovado + lc_cancelado)) * 100).toFixed(1) : 0;
-  const lc_resp        = mergeNested(src, 'lc_resp', ['total', 'renovado', 'cancelado', 'aberto', 'rec_renovado']);
+  const lc_resp        = mergeLcResp(src);
   const lc_bitrix_uso  = mergeKV(src, 'lc_bitrix_uso');
   const lc_motivos_churn = mergeKV(src, 'lc_motivos_churn');
 

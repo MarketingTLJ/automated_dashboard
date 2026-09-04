@@ -1,8 +1,9 @@
 ﻿import { SectionHeader } from '../components/ui/SectionHeader.jsx';
 import { KpiCard } from '../components/ui/KpiCard.jsx';
+import { InvestmentTable } from '../components/ui/InvestmentTable.jsx';
 import { RoiCplComposed } from '../components/charts/RoiCplComposed.jsx';
 import { RevenueInvestmentTrend } from '../components/charts/RevenueInvestmentTrend.jsx';
-import { fmt, fmtK, sclCls } from '../utils/formatters.js';
+import { fmt, fmtK } from '../utils/formatters.js';
 import { COLORS } from '../constants/index.js';
 
 export function Tab6_Investimentos({
@@ -89,46 +90,7 @@ export function Tab6_Investimentos({
       </div>
 
       {/* Table */}
-      <div className="glass-card rounded-2xl overflow-auto">
-        <div className="p-5 border-b border-gray-200">
-          <p className="text-gray-900 font-semibold text-sm">Tabela de Investimentos</p>
-        </div>
-        <table className="w-full text-xs">
-          <thead>
-            <tr className="border-b border-gray-200 text-gray-600 uppercase tracking-wider">
-              <th className="p-4 text-left">Mês</th>
-              <th className="p-4 text-right">Investimento</th>
-              <th className="p-4 text-right">Leads</th>
-              <th className="p-4 text-right">CPL</th>
-              <th className="p-4 text-right">Vendas</th>
-              <th className="p-4 text-right">ROI</th>
-            </tr>
-          </thead>
-          <tbody>
-            {last6.map((d, i) => (
-              <tr
-                key={d.ym}
-                className={`border-b border-gray-100 hover:bg-gray-50 ${
-                  i === last6.length - 1 ? 'bg-brand-blue/10' : ''
-                }`}
-              >
-                <td className={`p-4 font-bold ${i === last6.length - 1 ? 'text-brand-blue-light' : 'text-gray-600'}`}>
-                  {d.label}{i === last6.length - 1 ? ' ★' : ''}
-                </td>
-                <td className="p-4 text-right text-brand-blue-light font-mono">{fmt(d.inv)}</td>
-                <td className="p-4 text-right text-gray-600">{d.leads_total}</td>
-                <td className="p-4 text-right text-cyan-400 font-mono">{fmt(d.cpl)}</td>
-                <td className="p-4 text-right text-green-400 font-mono">{fmt(d.rec_v)}</td>
-                <td className="p-4 text-right">
-                  <span className={`px-2 py-1 rounded-lg text-xs font-bold border ${sclCls(d.roi, [15, 10])}`}>
-                    {d.roi}x
-                  </span>
-                </td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
-      </div>
+      <InvestmentTable last6={last6} />
 
       {/* Investimento x Faturamento x Lucro — últimos 6 meses, todas as fontes */}
       <div className="grid grid-cols-1 gap-5 mt-5">
