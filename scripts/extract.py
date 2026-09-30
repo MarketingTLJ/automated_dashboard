@@ -25,10 +25,10 @@ ROOT    = Path(__file__).parent.parent
 REPORTS = ROOT / "Reports"
 OUTPUT  = ROOT / "src" / "data" / "data.js"
 
-FILE_CLOSER       = REPORTS / "BASE CLOSER - MODIFICADO 2025 a 01.09.2026.xlsx"
-FILE_SDR          = REPORTS / "BASE SDR - MODIFICADO 2025 a 01.09.2026.xlsx"
-FILE_RENT         = REPORTS / "BASE RENTABILIZAÇÂO COMPLETA - 01.09.2026.xlsx"
-FILE_LC           = REPORTS / "BASE LICENCAS TODA - 01.09.2026.xlsx"
+FILE_CLOSER       = REPORTS / "BASE CLOSER - MODIFICADO 2025 a 30.09.2026.xlsx"
+FILE_SDR          = REPORTS / "BASE SDR - MODIFICADO 2025 a 30.09.2026.xlsx"
+FILE_RENT         = REPORTS / "BASE RENTABILIZAÇÂO COMPLETA - 30.09.2026.xlsx"
+FILE_LC           = REPORTS / "BASE LICENCAS TODA - 30.09.2026.xlsx"
 FILE_INV          = REPORTS / "INVESTIMENTOS.xlsx"
 FILE_FONTES_PAGAS = REPORTS / "FontesPagas.xlsx"
 
@@ -70,6 +70,11 @@ FASES_PERDIDO_RENT = {'Proposta Perdida', 'Finalizado sem oportunidade de venda'
                        'Não Renovou a Licença'}
 FASE_EXCLUIR_RENT = {'Duplicados'}
 
+# Rentabilização — fase de ganho. O Bitrix renomeou '8 - Ganho' → '8 - Venda Paga'
+# (rename retroativo, detectado no update de 30.09.2026). Grafia antiga mantida
+# por retrocompatibilidade.
+FASES_GANHO_RENT = {'8 - Venda Paga', '8 - Ganho'}
+
 # All months to process — skip months with no data
 ALL_MONTHS = [
     ("2025-01","Jan/25"), ("2025-02","Fev/25"), ("2025-03","Mar/25"),
@@ -78,7 +83,7 @@ ALL_MONTHS = [
     ("2025-10","Out/25"), ("2025-11","Nov/25"), ("2025-12","Dez/25"),
     ("2026-01","Jan/26"), ("2026-02","Fev/26"), ("2026-03","Mar/26"),
     ("2026-04","Abr/26"), ("2026-05","Mai/26"), ("2026-06","Jun/26"),
-    ("2026-07","Jul/26"), ("2026-08","Ago/26"),
+    ("2026-07","Jul/26"), ("2026-08","Ago/26"), ("2026-09","Set/26"),
 ]
 
 # Month label → YYYY-MM map (for investments)
@@ -464,11 +469,11 @@ def build_month(ym, label, sdr, closer, rent, lics, inv_map, inv_breakdown):
     # ─── VALOR RENTABILIZAÇÃO / EXPANSÃO (por criação, status atual) ──────────
     # Mesma lógica acima, mas para a base de Rentabilização. Duplicados excluídos.
     r_vol_valid = r_vol[~r_vol['Fase'].isin(FASE_EXCLUIR_RENT)]
-    rent_valor_ganho   = float(round(r_vol_valid[r_vol_valid['Fase']=='8 - Ganho']['Renda'].sum(), 2))
+    rent_valor_ganho   = float(round(r_vol_valid[r_vol_valid['Fase'].isin(FASES_GANHO_RENT)]['Renda'].sum(), 2))
     rent_valor_perdido = float(round(r_vol_valid[r_vol_valid['Fase'].isin(FASES_PERDIDO_RENT)]['Renda'].sum(), 2))
     rent_valor_total   = float(round(r_vol_valid['Renda'].sum(), 2))
     rent_valor_aberto  = round(max(rent_valor_total - rent_valor_ganho - rent_valor_perdido, 0), 2)
-    rent_qtd_ganho     = _safe_int((r_vol_valid['Fase']=='8 - Ganho').sum())
+    rent_qtd_ganho     = _safe_int(r_vol_valid['Fase'].isin(FASES_GANHO_RENT).sum())
     rent_qtd_perdido   = _safe_int(r_vol_valid['Fase'].isin(FASES_PERDIDO_RENT).sum())
     rent_qtd_aberto    = max(len(r_vol_valid) - rent_qtd_ganho - rent_qtd_perdido, 0)
 
@@ -498,7 +503,7 @@ def build_month(ym, label, sdr, closer, rent, lics, inv_map, inv_breakdown):
     r_fechado = rent[
         (rent['dt_fech'].dt.year==y) &
         (rent['dt_fech'].dt.month==m) &
-        (rent['Fase']=='8 - Ganho')
+        (rent['Fase'].isin(FASES_GANHO_RENT))
     ]
     r_ren = r_fechado[r_fechado['É renovação?'] == 'Sim'] \
         if 'É renovação?' in rent.columns else r_fechado.iloc[0:0]
@@ -687,7 +692,7 @@ def build_month_termino(ym, label, sdr, closer, rent, lics, inv_map, inv_breakdo
     qtd_v  = ganho
     ticket = round(rec_v / qtd_v, 2) if qtd_v > 0 else 0.0
 
-    r_fechado = rent[(rent['dt_fech'].dt.year==y) & (rent['dt_fech'].dt.month==m) & (rent['Fase']=='8 - Ganho')]
+    r_fechado = rent[(rent['dt_fech'].dt.year==y) & (rent['dt_fech'].dt.month==m) & (rent['Fase'].isin(FASES_GANHO_RENT))]
     r_ren = r_fechado[r_fechado['É renovação?'] == 'Sim'] \
         if 'É renovação?' in rent.columns else r_fechado.iloc[0:0]
     r_inc = r_fechado[~r_fechado.index.isin(r_ren.index)]
@@ -790,7 +795,7 @@ def main():
     sdr, closer, rent, lics = load_dataframes()
     print(f"  SDR:      {len(sdr)} records")
     print(f"  Closer:   {len(closer)} records")
-    print(f"  Rent:     {len(rent)} records ({(rent['Fase']=='8 - Ganho').sum()} ganhos)")
+    print(f"  Rent:     {len(rent)} records ({rent['Fase'].isin(FASES_GANHO_RENT).sum()} ganhos)")
     print(f"  Licenças: {len(lics)} records ({lics['Fase'].isin(FASES_LC_RENOVADO).sum()} renovadas, "
           f"{lics['Fase'].isin(FASES_LC_CANCELADO).sum()} canceladas)")
 

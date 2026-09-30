@@ -80,7 +80,7 @@ FASES_PERDIDO_SDR = {
 
 **Fases NÃO consideradas perdido** (ficam em `sdr_ativo`): `Entrada`, `Em conexão`/`Em Conexão`,
 `Conectado - Em atendimento`, `Pré Qualificado`, `Qualificado`, `Oportunidade Ouro`,
-`Oportunidade Diamante`, `Reunião agendada`, `No-Show`.
+`Oportunidade Diamante`, `Reunião agendada`, `Reagendado` (nova em 2026-09), `No-Show`.
 `Reunião Realizada` é excluída tanto de `sdr_ativo` quanto de `sdr_perdido` (lead avançou).
 
 > 🧹 **Sujeira de dados conhecida:** o pipeline tem `Em conexão` (26) e `Em Conexão` (21)
@@ -106,7 +106,7 @@ Arquivo: `BASE RENTABILIZAÇÂO COMPLETA - 01.06.2026.xlsx`
 |-------|--------|------|
 | Data ganho | `Data da mudança de etapa` | Usar quando `Fase='8 - Ganho'` |
 | Data fechamento | `Data de fechamento` | Planejada (não é data do ganho) |
-| Fase ganho | `Fase = '8 - Ganho'` | ⚠️ NÃO `Tipo='Incremento'` — estrutura mudou |
+| Fase ganho | `Fase ∈ FASES_GANHO_RENT` | `'8 - Venda Paga'` (atual) + `'8 - Ganho'` (legado). ⚠️ NÃO `Tipo='Incremento'` — estrutura mudou |
 | Valor | `Renda` | ⚠️ NÃO `Valor` — campo renomeado |
 | É renovação | `É renovação?` == `Sim` | Distingue renovação de incremento |
 | Fonte (VLOOKUP) | `Empresa` → Closer.`Empresa` → Closer.`Fonte` | ⚠️ Campo NÃO existe no arquivo — gerado via VLOOKUP automático em `extract.py` |
@@ -119,7 +119,12 @@ O `extract.py` busca a `Fonte` de cada negócio de Rentabilização pelo campo `
 4. Registros sem match recebem `'Não identificado'`
 
 > ⚠️ **BREAKING CHANGE vs docs antigas:** `Tipo` não tem mais `Incremento/Renovação`.
-> Usar `Fase='8 - Ganho'` + `É renovação?` para segmentar.
+> Usar `Fase ∈ FASES_GANHO_RENT` + `É renovação?` para segmentar.
+
+> ⚠️ **Rename 2026-09-30:** o Bitrix renomeou `'8 - Ganho'` → `'8 - Venda Paga'` (retroativo —
+> nenhum registro com a grafia antiga). Com o filtro antigo, `qtd_i`/`rec_i` teriam zerado em
+> todos os meses **sem erro**. Validado: `8 - Venda Paga` reproduz exatamente os incrementos
+> Mai/25–Ago/26 do extract anterior. A grafia antiga segue no set por retrocompatibilidade.
 
 ### 3.4 INVESTIMENTOS
 Arquivo: `INVESTIMENTOS.xlsx`
@@ -180,8 +185,9 @@ Arquivo: `INVESTIMENTOS.xlsx`
         - PP total e valor
         - Investimento total
         - Se aparecer erro/zero inesperado: checar se algum nome de Fase mudou no
-          Bitrix (já aconteceu com 'Ganho'→'Venda - Ganho' no Closer e com as fases
-          de perda do SDR — ver §3.1/§3.2) ou se o cabeçalho de mês em
+          Bitrix (já aconteceu com 'Ganho'→'Venda - Ganho' no Closer, com as fases
+          de perda do SDR e com '8 - Ganho'→'8 - Venda Paga' na Rentabilização —
+          ver §3.1/§3.2/§3.3) ou se o cabeçalho de mês em
           INVESTIMENTOS.xlsx não segue o padrão 'mmm/aa' minúsculo
 [ ] 4. npm run build (valida que compila sem erros antes de subir)
 [ ] 5. npm run dev e verificar visualmente as abas relevantes
@@ -543,4 +549,4 @@ lista muda no `extract.py`. Nunca duplicar essa lista no front.
 
 ---
 
-*Última atualização: Set/2026 | v4.7 — Leads Efetivos: 4º motivo `Sem Contato / Nunca respondeu!` (§14)*
+*Última atualização: Set/2026 | v4.8 — Rentabilização: fase de ganho renomeada para `8 - Venda Paga` (§3.3)*
