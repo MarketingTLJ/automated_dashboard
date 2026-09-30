@@ -172,6 +172,17 @@ def git_sync():
     return int(run(['git', 'rev-list', '--count', 'origin/main..HEAD']).stdout.strip() or 0)
 
 
+def git_push():
+    """GitHub às vezes devolve 403/5xx passageiro (visto em 2026-09-30) — tenta 3x."""
+    for attempt in range(3):
+        try:
+            return run(['git', 'push', 'origin', 'main'], timeout=180)
+        except Abort:
+            if attempt == 2:
+                raise
+            time.sleep(30)
+
+
 def wait_for_network(max_wait=600):
     """Ao acordar o PC às 06h o Wi-Fi demora a conectar — espera até 10 min."""
     t0 = time.time()
@@ -240,7 +251,7 @@ def main(dry_run=False):
             DATA_JS.write_text(old_text, encoding='utf-8')
             if ahead and not dry_run:
                 log(f"  Enviando {ahead} commit(s) pendente(s) de execução anterior + deploy")
-                run(['git', 'push', 'origin', 'main'], timeout=180)
+                git_push()
                 deploy()
             STATE.write_text(json.dumps({'counts': res['counts'], 'ok_em': datetime.now().isoformat()}), encoding='utf-8')
             return 0
@@ -263,7 +274,7 @@ def main(dry_run=False):
         run(['git', 'commit', '-m', f"data: atualização automática {datetime.now():%d/%m/%Y %H:%M} (Bitrix24)",
              '--', *paths])
         published = True  # commit local feito — daqui em diante não restaurar o data.js
-        run(['git', 'push', 'origin', 'main'], timeout=180)
+        git_push()
 
         log("6/6 Disparando deploy (Vercel Deploy Hook)")
         deploy()
