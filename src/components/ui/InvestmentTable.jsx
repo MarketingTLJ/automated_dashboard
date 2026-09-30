@@ -36,6 +36,7 @@ export function InvestmentTable({ last6 }) {
             const isCurrent = i === 0;
             const isSel = selMonth === d.ym;
             const cplEfetivos = d.leads_efetivos > 0 ? d.inv / d.leads_efetivos : 0;
+            const pend = d.inv_pendente; // investimento do mês ainda não lançado
             const vendas = d.vendas_detalhe || [];
             return (
               <Fragment key={d.ym}>
@@ -48,19 +49,23 @@ export function InvestmentTable({ last6 }) {
                   <td className={`p-4 font-bold ${isCurrent ? 'text-brand-blue-light' : 'text-gray-600'}`}>
                     {d.label}{isCurrent ? ' ★' : ''} {isSel ? '▲' : '▼'}
                   </td>
-                  <td className="p-4 text-right text-brand-blue-light font-mono">{fmt(d.inv)}</td>
+                  <td className="p-4 text-right text-brand-blue-light font-mono">
+                    {pend ? <span className="text-gray-400 font-sans">Aguardando</span> : fmt(d.inv)}
+                  </td>
                   <td className="p-4 text-right text-gray-600">{d.leads_total}</td>
                   <td className="p-4 text-right text-gray-600">{d.leads_efetivos}</td>
                   <td className="p-4 text-right text-gray-600">{d.reunioes}</td>
                   <td className="p-4 text-right text-gray-600">{pct(d.reunioes, d.leads_efetivos)}</td>
-                  <td className="p-4 text-right text-cyan-400 font-mono">{fmt(cplEfetivos)}</td>
+                  <td className="p-4 text-right text-cyan-400 font-mono">{pend ? '—' : fmt(cplEfetivos)}</td>
                   <td className="p-4 text-right text-gray-600">{d.qtd_v}</td>
                   <td className="p-4 text-right text-green-400 font-mono">{fmt(d.rec_v)}</td>
                   <td className="p-4 text-right text-gray-600">{pct(d.qtd_v, d.leads_efetivos)}</td>
                   <td className="p-4 text-right">
-                    <span className={`px-2 py-1 rounded-lg text-xs font-bold border ${sclCls(d.roi, [15, 10])}`}>
-                      {d.roi}x
-                    </span>
+                    {pend ? <span className="text-gray-400">—</span> : (
+                      <span className={`px-2 py-1 rounded-lg text-xs font-bold border ${sclCls(d.roi, [15, 10])}`}>
+                        {d.roi}x
+                      </span>
+                    )}
                   </td>
                 </tr>
                 {isSel && (

@@ -14,6 +14,10 @@ export function Tab6_Investimentos({
 }) {
   if (!CURR) return null;
 
+  // Investimento do mês ainda não lançado na planilha → não mostrar ROI 0x / CAC 0 enganosos
+  const pend = CURR.inv_pendente;
+  const PEND = { value: '—', sub: 'Aguardando investimento', color: COLORS.muted };
+
   return (
     <div>
       <SectionHeader number={6} title="Investimentos & ROI"
@@ -21,33 +25,38 @@ export function Tab6_Investimentos({
 
       {/* KPIs — row 1 */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-4">
+        {pend ? <KpiCard title="Total Investido" {...PEND} icon="📢" /> : (
         <KpiCard title="Total Investido" value={fmt(CURR.inv)} sub="Google + Meta + WhatsApp"
-          curr={CURR.inv} prev={PREV?.inv} color={COLORS.brandBlueLight} icon="📢" inv />
+          curr={CURR.inv} prev={PREV?.inv} color={COLORS.brandBlueLight} icon="📢" inv />)}
+        {pend ? <KpiCard title="ROI Líquido" {...PEND} icon="📈" /> : (
         <KpiCard title="ROI Líquido" value={`${CURR.roi}x`} sub="Lucro Bruto ÷ Investimento"
           curr={CURR.roi} prev={PREV?.roi}
-          color={CURR.roi < 8 ? COLORS.brandRed : CURR.roi >= 15 ? COLORS.ganho : '#f97316'} icon="📈" />
+          color={CURR.roi < 8 ? COLORS.brandRed : CURR.roi >= 15 ? COLORS.ganho : '#f97316'} icon="📈" />)}
+        {pend ? <KpiCard title="Lucro Bruto" {...PEND} icon="💵" /> : (
         <KpiCard title="Lucro Bruto" value={fmt(CURR.lucro_bruto ?? (CURR.rec_v - CURR.inv))}
           sub={`Vendas - Investimento`}
           curr={CURR.lucro_bruto ?? (CURR.rec_v - CURR.inv)} prev={PREV ? (PREV.lucro_bruto ?? (PREV.rec_v - PREV.inv)) : undefined}
-          color="#22c55e" icon="💵" />
+          color="#22c55e" icon="💵" />)}
+        {pend ? <KpiCard title="CAC" {...PEND} icon="🎯" /> : (
         <KpiCard title="CAC" value={fmt(CURR.cac ?? 0)} sub={`${CURR.qtd_v} contratos fechados`}
-          curr={CURR.cac ?? 0} prev={PREV?.cac} color={COLORS.brandBlueMid} icon="🎯" inv />
+          curr={CURR.cac ?? 0} prev={PREV?.cac} color={COLORS.brandBlueMid} icon="🎯" inv />)}
       </div>
       {/* KPIs — row 2 */}
       <div className="grid grid-cols-2 md:grid-cols-2 gap-4 mb-7">
+        {pend ? <KpiCard title="CPL" {...PEND} icon="👥" /> : (
         <KpiCard title="CPL" value={fmt(CURR.cpl)} sub={`${CURR.leads_total} leads totais`}
-          curr={CURR.cpl} prev={PREV?.cpl} color={COLORS.cpl} icon="👥" inv />
+          curr={CURR.cpl} prev={PREV?.cpl} color={COLORS.cpl} icon="👥" inv />)}
         <KpiCard
           title="Leads / R$1k investido"
-          value={CURR.inv > 0 ? ((CURR.leads_total / CURR.inv) * 1000).toFixed(1) : '—'}
-          sub="Produtividade de mídia"
-          color={COLORS.brandBlueLight}
+          value={!pend && CURR.inv > 0 ? ((CURR.leads_total / CURR.inv) * 1000).toFixed(1) : '—'}
+          sub={pend ? PEND.sub : 'Produtividade de mídia'}
+          color={pend ? COLORS.muted : COLORS.brandBlueLight}
           icon="⚡"
         />
       </div>
 
       {/* Critical ROI alert */}
-      {CURR.roi < 8 && (
+      {!pend && CURR.roi < 8 && (
         <div className="mb-5 p-4 rounded-2xl bg-red-500/10 border border-brand-red/30 flex items-start gap-3">
           <span className="text-2xl">🚨</span>
           <div>

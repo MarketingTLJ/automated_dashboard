@@ -1,6 +1,7 @@
 import { useMemo } from 'react';
 import { DATA, DATA_TERMINO } from '../data/data.js';
 import { FONTES_PAGAS } from '../constants/index.js';
+import { anyInvPendente } from '../utils/months.js';
 
 // ── Aggregation helpers ─────────────────────────────────────────────────────
 
@@ -87,6 +88,9 @@ function mergePP(arr) {
   return r;
 }
 
+// Mês sem investimento lançado: ROI/CPL viram null (o gráfico pula o ponto) em vez de 0
+const semInv = (d, v) => (d.inv_pendente ? null : v);
+
 // Maps an array of month records into the flat shape used by trend charts
 function buildTrend(arr) {
   return arr.map(d => ({
@@ -102,8 +106,8 @@ function buildTrend(arr) {
     taxa_fech:  d.taxa_fech,
     taxa_geral: d.leads_total > 0 ? +((d.qtd_v / d.leads_total) * 100).toFixed(1) : 0,
     inv:        d.inv,
-    roi:        d.roi,
-    cpl:        d.cpl,
+    roi:        semInv(d, d.roi),
+    cpl:        semInv(d, d.cpl),
     ticket:     d.ticket,
     total_rec:  d.rec_v + d.rec_i + d.rec_r,
     pp:         d.pp,
@@ -123,7 +127,8 @@ function buildTrend(arr) {
 
 // Fixed last-6-months slice of DATA — independent of the date filters,
 // used by charts that must always show a trailing 6-month trend (§ CLAUDE.md request).
-const LAST6_RAW = DATA.slice(-6);
+// Só meses FECHADOS: o mês em andamento (parcial) fica de fora das séries fixas.
+const LAST6_RAW = DATA.filter(d => !d.parcial).slice(-6);
 
 // Same calendar months as LAST6_RAW, one year earlier (e.g. Jan-Jun/26 → Jan-Jun/25).
 // Missing months (no data that far back) are simply omitted.
@@ -142,9 +147,9 @@ function buildInvestRevenue(arr, withIncrementos) {
     const faturamento = withIncrementos ? d.rec_v + d.rec_i : d.rec_v;
     const qtd = withIncrementos ? d.qtd_v + d.qtd_i : d.qtd_v;
     const inv = d.inv;
-    const lucro = +(faturamento - inv).toFixed(2);
-    const roi = inv > 0 ? +((faturamento - inv) / inv).toFixed(2) : 0;
-    const cac = qtd > 0 ? +(inv / qtd).toFixed(2) : 0;
+    const lucro = semInv(d, +(faturamento - inv).toFixed(2));
+    const roi = semInv(d, inv > 0 ? +((faturamento - inv) / inv).toFixed(2) : 0);
+    const cac = semInv(d, qtd > 0 ? +(inv / qtd).toFixed(2) : 0);
     const taxa = d.leads_total > 0 ? +((qtd / d.leads_total) * 100).toFixed(1) : 0;
     // reunioes = leads_closer (regra de negócio) — usa o campo já filtrado por fonte
     return { mes: d.label, inv, faturamento, lucro, roi, cac, taxa, leads: d.leads_total, reunioes: d.leads_closer, qtd };
@@ -354,6 +359,8 @@ function buildPeriodCurr(filtered, filteredT, label) {
     valor_total_prop, valor_aberto_prop, valor_perdido_prop, valor_ganho_prop,
     qtd_v, rec_v, qtd_i, rec_i, qtd_r, rec_r, ticket,
     inv, lucro_bruto, roi, cac, cpl,
+    // Algum mês do período sem investimento lançado → ROI/CAC/CPL/Lucro "aguardando"
+    inv_pendente: anyInvPendente(filtered, src),
     fonte_sdr, mp_sdr, mp_closer, inv_breakdown,
     closer_resp, vendas_resp, sdr_resp, sdr_mp_resp, closer_mp_resp, pp,
     lc_total, lc_renovado, lc_cancelado, lc_aberto,
@@ -434,7 +441,8 @@ export function useDerivedData(criadoStart, criadoEnd, terminoStart, terminoEnd,
     if (!base) return null;
     const ov = {};
     WIN_FIELDS.forEach(f => { if (t?.[f] !== undefined) ov[f] = t[f]; });
-    return { ...base, ...ov };
+    // CPL usa o inv do mês de criação; ROI/CAC/Lucro o do término — pendente se qualquer um faltar
+    return { ...base, ...ov, inv_pendente: anyInvPendente([base], [t]) };
   };
 
   const CURR_C = filteredF[filteredF.length - 1] ?? null;

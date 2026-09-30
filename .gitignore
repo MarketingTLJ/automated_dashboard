@@ -15,3 +15,7 @@ npm-debug.log*
 # Variáveis de ambiente
 .env
 .env.local
+
+# Logs e estado da atualização automática (scripts/auto_update.py)
+logs/
+__pycache__/

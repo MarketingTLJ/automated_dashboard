@@ -1,7 +1,9 @@
 """
 TLJ Dashboard — Data Extraction Script
-Reads Excel files from Reports/ and writes src/data/data.js
-Run: python scripts/extract.py
+Reads CRM data (Bitrix24 webhook by default, or the Excel exports as backup) plus
+Reports/INVESTIMENTOS.xlsx and writes src/data/data.js
+Run: python scripts/extract.py                  ← Bitrix24 (padrão, ver CLAUDE.md §15)
+     python scripts/extract.py --source excel   ← backup: planilhas exportadas em Reports/
 
 REGRA UNIVERSAL (todos os pipelines):
   Volume (leads/propostas)  = IDs com 'Criado' no mês
@@ -17,6 +19,7 @@ Column mapping (verified 2026-06-01):
   ROI:             (rec_v - inv) / inv  (Net ROI — lucro bruto / investimento)
 """
 
+import argparse
 import pandas as pd
 import json
 from pathlib import Path
@@ -24,8 +27,10 @@ from pathlib import Path
 ROOT    = Path(__file__).parent.parent
 REPORTS = ROOT / "Reports"
 OUTPUT  = ROOT / "src" / "data" / "data.js"
+TZ      = 'America/Sao_Paulo'
 
-FILE_CLOSER       = REPORTS / "BASE CLOSER - MODIFICADO 2025 a 30.09.2026.xlsx"
+# Backup (--source excel): planilhas exportadas manualmente do Bitrix
+FILE_CLOSER      = REPORTS / "BASE CLOSER - MODIFICADO 2025 a 30.09.2026.xlsx"
 FILE_SDR          = REPORTS / "BASE SDR - MODIFICADO 2025 a 30.09.2026.xlsx"
 FILE_RENT         = REPORTS / "BASE RENTABILIZAÇÂO COMPLETA - 30.09.2026.xlsx"
 FILE_LC           = REPORTS / "BASE LICENCAS TODA - 30.09.2026.xlsx"
@@ -75,22 +80,21 @@ FASE_EXCLUIR_RENT = {'Duplicados'}
 # por retrocompatibilidade.
 FASES_GANHO_RENT = {'8 - Venda Paga', '8 - Ganho'}
 
-# All months to process — skip months with no data
-ALL_MONTHS = [
-    ("2025-01","Jan/25"), ("2025-02","Fev/25"), ("2025-03","Mar/25"),
-    ("2025-04","Abr/25"), ("2025-05","Mai/25"), ("2025-06","Jun/25"),
-    ("2025-07","Jul/25"), ("2025-08","Ago/25"), ("2025-09","Set/25"),
-    ("2025-10","Out/25"), ("2025-11","Nov/25"), ("2025-12","Dez/25"),
-    ("2026-01","Jan/26"), ("2026-02","Fev/26"), ("2026-03","Mar/26"),
-    ("2026-04","Abr/26"), ("2026-05","Mai/26"), ("2026-06","Jun/26"),
-    ("2026-07","Jul/26"), ("2026-08","Ago/26"), ("2026-09","Set/26"),
-]
-
 # Month label → YYYY-MM map (for investments)
 _MES_PT = {
     'jan':'01','fev':'02','mar':'03','abr':'04','mai':'05','jun':'06',
     'jul':'07','ago':'08','set':'09','out':'10','nov':'11','dez':'12'
 }
+
+# Mês corrente em São Paulo — é o mês "parcial" (em andamento) do dashboard
+CURRENT_YM = pd.Timestamp.now(tz=TZ).strftime('%Y-%m')
+
+# All months to process (Jan/25 → mês corrente, gerado sozinho) — skip months with no data
+_LABEL_PT = {v: k.capitalize() for k, v in _MES_PT.items()}
+ALL_MONTHS = [
+    (p.strftime('%Y-%m'), f"{_LABEL_PT[p.strftime('%m')]}/{p.strftime('%y')}")
+    for p in pd.period_range('2025-01', CURRENT_YM, freq='M')
+]
 
 
 def _ym(label: str) -> str:
@@ -162,6 +166,9 @@ def _vlookup_fonte(df, closer, label=''):
     """VLOOKUP: df.Empresa → Closer.Empresa → Closer.Fonte. Mutates df in-place."""
     if 'Empresa' in closer.columns and 'Fonte' in closer.columns and 'Empresa' in df.columns:
         empresa_fonte = {}
+        # Empresa com várias vendas de fontes diferentes → vale a venda MAIS RECENTE
+        # (maior ID). Era o que a ordem da planilha exportada fazia implicitamente.
+        closer = closer.sort_values('ID', ascending=False)
         for fase in ['Venda - Ganho', None]:
             subset = closer[closer['Fase'] == fase] if fase else closer
             for _, row in subset[['Empresa', 'Fonte']].dropna().iterrows():
@@ -179,32 +186,109 @@ def _vlookup_fonte(df, closer, label=''):
         df['Fonte'] = 'Não identificado'
 
 
-def load_dataframes():
-    print("  Loading SDR...")
-    sdr = pd.read_excel(FILE_SDR)
+# Informações da execução — lidas pelo scripts/auto_update.py
+RUN_INFO = {'source': None, 'counts': {}, 'warnings': []}
+
+
+class SchemaError(RuntimeError):
+    """O Bitrix mudou de um jeito que distorceria os números — NÃO publicar."""
+
+
+def _prepare(sdr, closer, rent, lics):
+    """Colunas derivadas comuns às duas fontes (Excel e Bitrix)."""
     sdr['dt']      = pd.to_datetime(sdr['Criado'],              errors='coerce')
     sdr['dt_fech'] = pd.to_datetime(sdr['Data de fechamento'],  errors='coerce')
     sdr['FaseAdj'] = sdr['Fase'].apply(
         lambda x: 'Perdido' if x in FASES_PERDIDO_SDR else x
     )
 
-    print("  Loading Closer...")
-    closer = pd.read_excel(FILE_CLOSER)
     closer['dt']      = pd.to_datetime(closer['Criado'],              errors='coerce')
     closer['dt_fech'] = pd.to_datetime(closer['Data de fechamento'],  errors='coerce')
 
-    print("  Loading Rentabilização...")
-    rent = pd.read_excel(FILE_RENT)
     rent['dt']       = pd.to_datetime(rent['Criado'],               errors='coerce')  # volume
     rent['dt_fech']  = pd.to_datetime(rent['Data de fechamento'],   errors='coerce')  # ganhos do mês
     _vlookup_fonte(rent, closer, label='Rent')
 
-    print("  Loading Licenças CS...")
-    lics = pd.read_excel(FILE_LC)
     lics['dt_venc'] = pd.to_datetime(lics['[LC] Data de vencimento'], errors='coerce')
     _vlookup_fonte(lics, closer, label='LC')
 
     return sdr, closer, rent, lics
+
+
+def _latest(default: Path, pattern: str) -> Path:
+    """Planilha mais recente que casa com o padrão (o nome muda a cada exportação)."""
+    found = sorted(REPORTS.glob(pattern), key=lambda p: p.stat().st_mtime)
+    return found[-1] if found else default
+
+
+def load_dataframes_excel():
+    files = [_latest(FILE_SDR, 'BASE SDR*.xlsx'), _latest(FILE_CLOSER, 'BASE CLOSER*.xlsx'),
+             _latest(FILE_RENT, 'BASE RENTABILIZA*.xlsx'), _latest(FILE_LC, 'BASE LICEN*.xlsx')]
+    for f in files:
+        print(f"  Loading {f.name}...")
+    return _prepare(*(pd.read_excel(f) for f in files))
+
+
+def check_bitrix_schema(meta):
+    """
+    Trava de segurança contra renomeação de fases/motivos no Bitrix — o erro que já
+    distorceu o dashboard 3 vezes sem nenhum aviso (§3.1, §3.3, §14).
+    Usa a SEMÂNTICA da fase (success/failure/apology), que o Bitrix mantém quando
+    alguém renomeia a etapa. Levanta SchemaError quando os números ficariam errados.
+    """
+    from bitrix_source import CAT_SDR, CAT_CLOSER, CAT_RENT, CAT_LC, UF_MOTIVO_SDR
+    problems = []
+    by_sem = {cat: {} for cat in meta['stages']}
+    for cat, lst in meta['stages'].items():
+        for s in lst:
+            by_sem[cat].setdefault(s['SEMANTICS'], []).append(s['NAME'])
+
+    # SDR: toda fase de perda (failure/apology) tem de estar em FASES_PERDIDO_SDR
+    for nome in by_sem[CAT_SDR].get('failure', []) + by_sem[CAT_SDR].get('apology', []):
+        if nome not in FASES_PERDIDO_SDR:
+            problems.append(f"SDR: fase de perda '{nome}' não está em FASES_PERDIDO_SDR")
+    if 'Reunião Realizada' not in by_sem[CAT_SDR].get('success', []):
+        problems.append(f"SDR: fase de sucesso mudou de nome: {by_sem[CAT_SDR].get('success')}")
+
+    # Closer: ganho = 'Venda - Ganho', perdido = 'Perdido'
+    if 'Venda - Ganho' not in by_sem[CAT_CLOSER].get('success', []):
+        problems.append(f"Closer: fase de ganho mudou de nome: {by_sem[CAT_CLOSER].get('success')}")
+    if 'Perdido' not in by_sem[CAT_CLOSER].get('failure', []):
+        problems.append(f"Closer: fase de perda mudou de nome: {by_sem[CAT_CLOSER].get('failure')}")
+
+    # Rentabilização: fase de ganho tem de estar em FASES_GANHO_RENT
+    for nome in by_sem[CAT_RENT].get('success', []):
+        if nome not in FASES_GANHO_RENT:
+            problems.append(f"Rentabilização: fase de ganho '{nome}' não está em FASES_GANHO_RENT")
+
+    # Licenças: renovado / cancelado
+    for nome in by_sem[CAT_LC].get('success', []):
+        if nome not in FASES_LC_RENOVADO:
+            problems.append(f"Licenças: fase de renovação '{nome}' não está em FASES_LC_RENOVADO")
+    for nome in by_sem[CAT_LC].get('failure', []):
+        if nome not in FASES_LC_CANCELADO:
+            problems.append(f"Licenças: fase de cancelamento '{nome}' não está em FASES_LC_CANCELADO")
+
+    # Motivos descontados de Leads Efetivos têm de existir com a grafia exata
+    motivos = set(meta['enums'][UF_MOTIVO_SDR].values())
+    for m in sorted(MOTIVOS_NAO_EFETIVOS - motivos):
+        problems.append(f"Motivo '{m}' (MOTIVOS_NAO_EFETIVOS) não existe mais no Bitrix — foi renomeado?")
+
+    if problems:
+        raise SchemaError("Mudança no Bitrix exige revisão antes de publicar:\n  - " + "\n  - ".join(problems))
+
+    if meta['users_missing']:
+        RUN_INFO['warnings'].append(
+            f"Pessoas sem nome (aparecem como 'Usuário <ID>'): {meta['users_missing']} — "
+            f"adicionar em scripts/bitrix_users.json ou dar escopo user_brief ao webhook (§15.4)")
+
+
+def load_dataframes_bitrix():
+    from bitrix_source import load_raw_frames
+    meta = load_raw_frames()
+    check_bitrix_schema(meta)
+    RUN_INFO['counts'] = meta['counts']
+    return _prepare(meta['sdr'], meta['closer'], meta['rent'], meta['lics'])
 
 
 def _safe_int(x):
@@ -218,7 +302,14 @@ def _safe_int(x):
 def _motivos(df, col='[SDR] Motivo de perda', n=8):
     if col not in df.columns:
         return {}
-    return {str(k): _safe_int(v) for k, v in df[col].value_counts().head(n).items()}
+    return _top(df[col], n)
+
+
+def _top(series, n):
+    """Top-n de value_counts com desempate por nome — sem isso o corte com empates
+    mudava conforme a ordem das linhas (Excel vs Bitrix davam resultados diferentes)."""
+    top = sorted(series.value_counts().items(), key=lambda kv: (-kv[1], str(kv[0])))[:n]
+    return {str(k): _safe_int(v) for k, v in top}
 
 
 def _descartados(df, col='[SDR] Motivo de perda'):
@@ -411,14 +502,12 @@ def _build_lc_fields(lics, y, m):
     bitrix_col = '[LC] Cliente está usando Bitrix?'
     lc_bitrix_uso = {}
     if bitrix_col in lc.columns and lc_total > 0:
-        lc_bitrix_uso = {str(k): int(v)
-                         for k, v in lc[bitrix_col].value_counts().head(6).items()}
+        lc_bitrix_uso = _top(lc[bitrix_col], 6)
 
     # Motivos de churn
     lc_motivos_churn = {}
     if motivo_col in can.columns and len(can) > 0:
-        lc_motivos_churn = {str(k): int(v)
-                            for k, v in can[motivo_col].value_counts().head(8).items()}
+        lc_motivos_churn = _top(can[motivo_col], 8)
 
     return {
         'lc_total':          lc_total,
@@ -639,7 +728,7 @@ def build_month(ym, label, sdr, closer, rent, lics, inv_map, inv_breakdown):
         'cac':          cac,
         'cpl':          cpl,
         'inv_breakdown': inv_breakdown.get(ym, {}),
-        'fonte_sdr':    {str(k): _safe_int(v) for k, v in s['Fonte'].value_counts().head(8).items()},
+        'fonte_sdr':    _top(s['Fonte'], 8),
         'mp_sdr':       _motivos(s[s['FaseAdj']=='Perdido']),
         'mp_closer':    _motivos(c[c['Fase']=='Perdido']),
         'sdr_resp':     sdr_resp,
@@ -778,8 +867,11 @@ def build_month_termino(ym, label, sdr, closer, rent, lics, inv_map, inv_breakdo
     }
 
 
-def main():
-    print("TLJ Dashboard — Data Extraction")
+def main(source='bitrix', output=None):
+    """Gera o data.js. Levanta exceção em qualquer falha (o auto_update depende disso)."""
+    output = Path(output) if output else OUTPUT
+    RUN_INFO.update(source=source, counts={}, warnings=[])
+    print(f"TLJ Dashboard — Data Extraction (fonte: {source})")
     print("=" * 50)
 
     print("Loading fontes pagas...")
@@ -792,7 +884,9 @@ def main():
     print(f"  Found investments for {len(inv_map)} months: {sorted(inv_map.keys())}")
 
     print("Loading CRM data...")
-    sdr, closer, rent, lics = load_dataframes()
+    sdr, closer, rent, lics = load_dataframes_bitrix() if source == 'bitrix' else load_dataframes_excel()
+    if not RUN_INFO['counts']:
+        RUN_INFO['counts'] = {'sdr': len(sdr), 'closer': len(closer), 'rent': len(rent), 'lics': len(lics)}
     print(f"  SDR:      {len(sdr)} records")
     print(f"  Closer:   {len(closer)} records")
     print(f"  Rent:     {len(rent)} records ({rent['Fase'].isin(FASES_GANHO_RENT).sum()} ganhos)")
@@ -816,7 +910,7 @@ def main():
             print(f"leads={row['leads_total']}, ganho={row['ganho']}, rec_v=R${row['rec_v']:,.0f}{lc_info}")
         except Exception as e:
             print(f"ERROR: {e}")
-            import traceback; traceback.print_exc()
+            raise
 
     print("\nBuilding DATA_TERMINO (by Data de fechamento / vencimento)...")
     for ym, label in ALL_MONTHS:
@@ -831,10 +925,16 @@ def main():
                 monthly_termino.append(row_t)
         except Exception as e:
             print(f"  ERROR {label}: {e}")
+            raise
 
     if not monthly:
-        print("ERROR: No months processed. Check file paths.")
-        return
+        raise RuntimeError("No months processed. Check data source.")
+
+    # Mês em andamento e investimento ainda não lançado — o front mostra
+    # "parcial" / "aguardando investimento" em vez de ROI 0x (CLAUDE.md §15.7)
+    for row in monthly + monthly_termino:
+        row['parcial']      = row['ym'] == CURRENT_YM
+        row['inv_pendente'] = inv_map.get(row['ym'], 0) <= 0
 
     # Validation checkpoint — compare against reference prints
     print("\n=== VALIDATION vs REFERÊNCIA ===")
@@ -842,7 +942,6 @@ def main():
         '2026-01': dict(leads=188, qtd_v=9, rec_v=91663.40, roi=11.94, inv=7081.41),
         '2026-02': dict(leads=223, qtd_v=7, rec_v=98942.00, roi=12.11, inv=7544.40),
         '2026-03': dict(leads=228, qtd_v=4, rec_v=67021.60, roi=4.10,  inv=13153.68),
-        '2026-04': dict(leads=135, qtd_v=4, rec_v=42448.20, roi=3.94,  inv=8584.30),
     }
     for ym_r, exp in refs.items():
         got = next((m for m in monthly if m['ym']==ym_r), None)
@@ -859,24 +958,39 @@ def main():
               f"| rec_v=R${got['rec_v']:,.0f} (exp:R${exp['rec_v']:,.0f}) "
               f"| roi={got['roi']}x (exp:{exp['roi']}x)")
 
+    for w in RUN_INFO['warnings']:
+        print(f"  AVISO: {w}")
+
     # Write output — two named exports
-    OUTPUT.parent.mkdir(parents=True, exist_ok=True)
+    output.parent.mkdir(parents=True, exist_ok=True)
     first, last = monthly[0]['label'], monthly[-1]['label']
+    atualizado_em = pd.Timestamp.now(tz=TZ).strftime('%Y-%m-%dT%H:%M')
     content = (
         f"// AUTO-GENERATED by scripts/extract.py — DO NOT EDIT MANUALLY\n"
-        f"// Last updated: {pd.Timestamp.now().strftime('%Y-%m-%d %H:%M')}\n"
+        f"// Last updated: {atualizado_em.replace('T', ' ')} (fonte: {source})\n"
         f"// DATA:        {first} → {last} ({len(monthly)} months, by Criado)\n"
         f"// DATA_TERMINO: {monthly_termino[0]['label'] if monthly_termino else '?'} → {monthly_termino[-1]['label'] if monthly_termino else '?'} ({len(monthly_termino)} months, by dt_fech)\n\n"
         f"export const DATA = {json.dumps(monthly, ensure_ascii=False, indent=2)};\n\n"
         f"export const DATA_TERMINO = {json.dumps(monthly_termino, ensure_ascii=False, indent=2)};\n\n"
         f"export const FONTES_PAGAS = {json.dumps(sorted(fontes_pagas), ensure_ascii=False)};\n\n"
         f"// Motivos de perda descontados de `leads_efetivos` (lead nunca foi oportunidade real)\n"
-        f"export const MOTIVOS_NAO_EFETIVOS = {json.dumps(sorted(MOTIVOS_NAO_EFETIVOS), ensure_ascii=False)};\n"
+        f"export const MOTIVOS_NAO_EFETIVOS = {json.dumps(sorted(MOTIVOS_NAO_EFETIVOS), ensure_ascii=False)};\n\n"
+        f"// Momento da extração (horário de São Paulo) e origem dos dados do CRM\n"
+        f"export const ATUALIZADO_EM = {json.dumps(atualizado_em)};\n"
+        f"export const FONTE_DADOS = {json.dumps(source)};\n"
     )
-    OUTPUT.write_text(content, encoding='utf-8')
-    print(f"\nWrote {len(monthly)} months (DATA) + {len(monthly_termino)} months (DATA_TERMINO) to {OUTPUT}")
+    output.write_text(content, encoding='utf-8')
+    print(f"\nWrote {len(monthly)} months (DATA) + {len(monthly_termino)} months (DATA_TERMINO) to {output}")
     print("Done!")
+    return {'monthly': monthly, 'monthly_termino': monthly_termino, **RUN_INFO}
 
 
 if __name__ == "__main__":
-    main()
+    import sys
+    sys.stdout.reconfigure(encoding='utf-8')
+    ap = argparse.ArgumentParser(description="Gera src/data/data.js")
+    ap.add_argument('--source', choices=['bitrix', 'excel'], default='bitrix',
+                    help="bitrix = webhook (padrão); excel = planilhas em Reports/ (backup)")
+    ap.add_argument('--output', help="caminho alternativo do data.js (testes)")
+    args = ap.parse_args()
+    main(args.source, args.output)

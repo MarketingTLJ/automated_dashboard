@@ -15,8 +15,11 @@ export function generateAlerts(curr, prev) {
     ? +((curr.qtd_v / curr.leads_total) * 100).toFixed(1)
     : 0;
 
+  // Investimento ainda não lançado → ROI/CPL não são avaliados (seriam 0 / enganosos)
+  const temInv = !curr.inv_pendente;
+
   // ── Critical (red) ────────────────────────────────────────────────────────
-  if (curr.roi < ALERT_THR.roiCritical)
+  if (temInv && curr.roi < ALERT_THR.roiCritical)
     a.push({ t: 'red', icon: '🚨', msg: `ROI em ${curr.roi}x — abaixo da meta de ${ROI_TARGET}x. Investimento de ${fmt(curr.inv)} com retorno mais baixo do período.` });
 
   for (const [nm, d] of Object.entries(curr.vendas_resp || {})) {
@@ -37,7 +40,7 @@ export function generateAlerts(curr, prev) {
     a.push({ t: 'red', icon: '🚨', msg: `Propostas Perdidas: ${curr.pp.total} negócios · ${fmt(curr.pp.valor)} em receita perdida.` });
 
   // ── Warning (amber) ──────────────────────────────────────────────────────
-  if (curr.cpl > ALERT_THR.cplHigh)
+  if (temInv && curr.cpl > ALERT_THR.cplHigh)
     a.push({ t: 'amber', icon: '⚠️', msg: `CPL de ${fmt(curr.cpl)} — mais alto do período (inv. ${fmt(curr.inv)} ÷ ${curr.leads_total} leads).` });
 
   if (prev) {
@@ -61,7 +64,7 @@ export function generateAlerts(curr, prev) {
       a.push({ t: 'green', icon: '✅', msg: `Incrementos cresceram ${di}% — ${fmt(curr.rec_i)} (${curr.qtd_i} registros).` });
   }
 
-  if (curr.roi >= ROI_TARGET)
+  if (temInv && curr.roi >= ROI_TARGET)
     a.push({ t: 'green', icon: '✅', msg: `ROI de ${curr.roi}x — acima da meta de ${ROI_TARGET}x.` });
 
   return a.slice(0, 6);

@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef } from 'react';
 import { DATA } from '../../data/data.js';
+import { ALL_YMS, CLOSED_YMS, LAST_CLOSED, PARTIAL_YM, isPartial } from '../../utils/months.js';
 
-const ALL_YMS    = DATA.map(d => d.ym);
 const ALL_LABELS = DATA.map(d => d.label);
 
 const MONTH_NAMES = [
@@ -29,24 +29,29 @@ function fromYm(ym) {
 
 function fmtLabel(ym) {
   const i = ALL_YMS.indexOf(ym);
-  return i >= 0 ? ALL_LABELS[i] : ym;
+  const label = i >= 0 ? ALL_LABELS[i] : ym;
+  return isPartial(ym) ? `${label} (parcial)` : label;
 }
 
+// Atalhos contam a partir do último mês FECHADO; o mês em andamento tem atalho próprio
 function getPresets() {
-  const last = ALL_YMS.at(-1);
-  const get  = (n) => ALL_YMS.at(-n) ?? ALL_YMS[0];
-  const y25  = ALL_YMS.filter(ym => ym.startsWith('2025'));
-  const y26  = ALL_YMS.filter(ym => ym.startsWith('2026'));
+  const last = LAST_CLOSED;
+  const get  = (n) => CLOSED_YMS.at(-n) ?? CLOSED_YMS[0] ?? last;
+  const curY = last.slice(0, 4);
+  const prvY = String(+curY - 1);
+  const yCur = CLOSED_YMS.filter(ym => ym.startsWith(curY));
+  const yPrv = CLOSED_YMS.filter(ym => ym.startsWith(prvY));
   return [
-    { label: 'Este mês',            start: last,                  end: last },
-    { label: 'Mês passado',         start: get(2),                end: get(2) },
+    ...(PARTIAL_YM ? [{ label: 'Mês em andamento',  start: PARTIAL_YM, end: PARTIAL_YM }] : []),
+    { label: 'Último mês fechado',  start: last,                  end: last },
+    { label: 'Mês anterior',        start: get(2),                end: get(2) },
     { label: 'Últimos 3 meses',     start: get(3),                end: last },
     { label: 'Últimos 6 meses',     start: get(6),                end: last },
     { label: 'Último trimestre',    start: get(4),                end: last },
-    { label: 'Últimos 12 meses',    start: get(12),               end: last },
-    { label: 'Ano atual (2026)',     start: y26[0] ?? last,        end: last },
-    { label: 'Ano anterior (2025)', start: y25[0] ?? ALL_YMS[0],  end: y25.at(-1) ?? last },
-    { label: 'Tudo',                start: ALL_YMS[0],            end: last },
+    { label: 'Últimos 12 meses',   start: get(12),               end: last },
+    { label: `Ano atual (${curY})`,     start: yCur[0] ?? last,       end: last },
+    { label: `Ano anterior (${prvY})`,  start: yPrv[0] ?? ALL_YMS[0], end: yPrv.at(-1) ?? last },
+    { label: 'Tudo',                start: ALL_YMS[0],            end: ALL_YMS.at(-1) },
   ];
 }
 

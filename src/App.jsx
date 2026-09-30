@@ -1,5 +1,6 @@
 import { useState } from 'react';
-import { DATA } from './data/data.js';
+import { ATUALIZADO_EM } from './data/data.js';
+import { ALL_YMS, LAST_CLOSED } from './utils/months.js';
 import { useDerivedData } from './hooks/useDerivedData.js';
 import { Header } from './components/layout/Header.jsx';
 import { Footer } from './components/layout/Footer.jsx';
@@ -12,9 +13,9 @@ import { Tab5_PropostasPerdidas }  from './tabs/Tab5_PropostasPerdidas.jsx';
 import { Tab6_Investimentos }      from './tabs/Tab6_Investimentos.jsx';
 import { Tab7_Licencas }           from './tabs/Tab7_Licencas.jsx';
 
-const ALL_MONTHS = DATA.map(d => d.ym);
-const LAST       = ALL_MONTHS[ALL_MONTHS.length - 1];
-const SIX_AGO    = ALL_MONTHS[Math.max(0, ALL_MONTHS.length - 6)];
+// Abre no último mês FECHADO — o mês em andamento fica disponível como "parcial"
+const LAST    = LAST_CLOSED;
+const SIX_AGO = ALL_YMS[Math.max(0, ALL_YMS.indexOf(LAST) - 5)];
 
 export default function App() {
   const [activeTab, setActiveTab] = useState(0);
@@ -58,7 +59,7 @@ export default function App() {
         onTerminoStartChange={setTerminoStart}
         onTerminoEndChange={setTerminoEnd}
         allMonths={allMonths}
-        currLabel={CURR?.label ?? '—'}
+        currLabel={CURR ? `${CURR.label}${!isRange && CURR.parcial ? ' (parcial)' : ''}` : '—'}
         allFontes={allFontes}
         fonteFilter={fonteFilter}
         onFonteFilterChange={setFonteFilter}
@@ -83,6 +84,7 @@ export default function App() {
       <Footer
         firstLabel={filtered[0]?.label ?? '—'}
         lastLabel={filtered[filtered.length - 1]?.label ?? '—'}
+        atualizadoEm={ATUALIZADO_EM}
       />
     </div>
   );

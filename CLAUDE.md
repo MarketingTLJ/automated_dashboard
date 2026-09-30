@@ -6,8 +6,9 @@
 
 ## 1. VISÃO GERAL
 
-Dashboard executivo mensal do **Grupo TLJ** que centraliza Receita, Marketing e Vendas.
-App React (Vite) com atualização mensal via script Python.
+Dashboard executivo do **Grupo TLJ** que centraliza Receita, Marketing e Vendas.
+App React (Vite) com **atualização automática diária às 06:00** — dados do CRM direto do
+Bitrix24 via webhook (§15). A única entrada manual é a planilha `Reports/INVESTIMENTOS.xlsx`.
 
 **Stack:** Vite + React 18 + Recharts + Tailwind CSS (tokens TLJ) + Python/pandas  
 **Usuários:** CEO/Diretoria (visão executiva) + Closers/SDRs/CS (visão operacional)
@@ -23,8 +24,13 @@ automated-reports/
 ├── package.json
 ├── tailwind.config.js     ← tokens: brand-blue, brand-red, brand-blue-light, surface-*
 ├── index.html             ← DM Sans Google Fonts, lang=pt-BR
+├── logs/                  ← auto_update.log + estado.json (gitignored)
 ├── scripts/
-│   ├── extract.py         ← ÚNICA fonte de data.js — nunca editar data.js à mão
+│   ├── extract.py         ← ÚNICA fonte de data.js — nunca editar data.js à mão (--source bitrix|excel)
+│   ├── bitrix_source.py   ← lê os 4 pipelines do Bitrix24 (somente leitura) — §15
+│   ├── bitrix_users.json  ← ID do Bitrix → nome da pessoa (§15.4)
+│   ├── auto_update.py     ← rotina diária: extrai → trava → build → commit/push → deploy
+│   ├── registrar_agendamento.ps1 ← cria a tarefa das 06:00 no Agendador do Windows
 │   ├── inspect_excel.py   ← diagnóstico de estrutura dos arquivos Excel
 │   └── inspect2.py        ← validação de cálculos por mês
 ├── src/
@@ -33,6 +39,7 @@ automated-reports/
 │   ├── data/data.js       ← GERADO pelo Python
 │   ├── hooks/useDerivedData.js  ← toda a lógica de agregação e CURR/PREV
 │   ├── utils/
+│   │   ├── months.js      ← LAST_CLOSED, PARTIAL_YM, anyInvPendente (mês em andamento — §15.7)
 │   │   ├── formatters.js  ← fmt, fmtK, pct, dp, scl, sclCls
 │   │   ├── alertEngine.js ← geração de alertas diagnósticos
 │   │   └── respToArray.js ← closerRespToArr, sdrRespToArr (transforma objetos em arrays)
@@ -41,12 +48,16 @@ automated-reports/
 │   │   ├── layout/        ← Header, PeriodSelector, Footer
 │   │   └── charts/        ← RevenueStackedBar, ConversionRateBar, FunnelBars, WinLossBar, RoiCplComposed
 │   └── tabs/              ← Tab0_ResumoExecutivo … Tab6_Investimentos
-└── Reports/               ← arquivos Excel (não versionados)
+└── Reports/               ← INVESTIMENTOS.xlsx, FontesPagas.xlsx (+ exportações antigas, backup) — não versionados
 ```
 
 ---
 
 ## 3. MAPEAMENTO DE DADOS (verificado 2026-06-01)
+
+> Desde 2026-09-30 os dados do CRM vêm da **API do Bitrix24** (§15), que reproduz exatamente
+> as colunas abaixo. As planilhas exportadas viraram **backup** (`extract.py --source excel`).
+> As regras de fase/motivo desta seção valem igual para as duas fontes.
 
 ### 3.1 BASE SDR
 Arquivo: `BASE SDR - MODIFICADO 2025 a 01.06.25.xlsx`
@@ -172,32 +183,39 @@ Arquivo: `INVESTIMENTOS.xlsx`
 
 ---
 
-## 5. ATUALIZAÇÃO MENSAL
+## 5. ATUALIZAÇÃO — ROTINA (automática desde 2026-09-30)
 
+### Diária — automática, ninguém precisa fazer nada
+Todo dia às **06:00** a tarefa `TLJ Dashboard - Atualizacao diaria` do Agendador do Windows
+(neste PC) roda `scripts/auto_update.py`: Bitrix24 + INVESTIMENTOS.xlsx → `data.js` → travas
+de segurança → `npm run build` → commit **só do data.js** → push → Deploy Hook. Detalhes em §15.8.
+
+### Mensal — a única tarefa manual do usuário
 ```
-[ ] 1. Receber Excel atualizados em Reports/ (nomes de arquivo mudam a cada envio —
-        conferir a data no nome e atualizar FILE_CLOSER/FILE_SDR/FILE_RENT/FILE_LC
-        em scripts/extract.py se necessário)
-[ ] 2. python scripts/extract.py
-[ ] 3. Validar números-chave no output:
-        - Total leads do mês
-        - Ganhos e receita novas vendas
-        - PP total e valor
-        - Investimento total
-        - Se aparecer erro/zero inesperado: checar se algum nome de Fase mudou no
-          Bitrix (já aconteceu com 'Ganho'→'Venda - Ganho' no Closer, com as fases
-          de perda do SDR e com '8 - Ganho'→'8 - Venda Paga' na Rentabilização —
-          ver §3.1/§3.2/§3.3) ou se o cabeçalho de mês em
-          INVESTIMENTOS.xlsx não segue o padrão 'mmm/aa' minúsculo
-[ ] 4. npm run build (valida que compila sem erros antes de subir)
-[ ] 5. npm run dev e verificar visualmente as abas relevantes
-[ ] 6. git add <arquivos relevantes> (nunca `git add -A` — evita commitar
-        .claude/settings.local.json, .temp/, .trash/)
-[ ] 7. git commit -m "data: add MMM/26" && git push origin main
-[ ] 8. Disparar o deploy manual — ver §13. DEPLOY (o auto-deploy do Vercel
-        não está disparando sozinho a cada push)
-[ ] 9. Aguardar 1-3 min e conferir https://automated-dashboard.vercel.app (Ctrl+F5)
+[ ] Depois que o mês fecha: acrescentar a coluna do mês em Reports/INVESTIMENTOS.xlsx
+    (cabeçalho 'mmm/aa' minúsculo, ex: 'out/26'; mesmo formato das colunas anteriores).
+    A próxima execução das 06:00 publica sozinha. Até lá, o mês aparece como
+    "Aguardando investimento" (ROI/CAC/CPL/Lucro) — não como ROI 0x.
+[ ] Se uma fonte paga mudar: editar Reports/FontesPagas.xlsx e sincronizar FONTES_PAGAS
+    em src/constants/index.js (§12)
 ```
+
+### Quando o Claude for chamado para "atualizar o relatório" / investigar
+```
+[ ] 1. Ler logs/auto_update.log (última execução e motivo de falha, se houver)
+[ ] 2. Rodar na hora: python scripts/auto_update.py      (ou --dry-run para testar sem publicar)
+[ ] 3. Se falhar por SchemaError (fase/motivo renomeado no Bitrix): revisar FASES_* /
+        MOTIVOS_NAO_EFETIVOS em extract.py com o usuário — NUNCA publicar sem confirmar
+        (já aconteceu 3x: 'Ganho'→'Venda - Ganho' no Closer, perdas do SDR, e
+        '8 - Ganho'→'8 - Venda Paga' na Rentabilização — ver §3.1/§3.2/§3.3)
+[ ] 4. Se INVESTIMENTOS.xlsx der erro: conferir cabeçalho 'mmm/aa' minúsculo
+[ ] 5. Conferir https://automated-dashboard.vercel.app (Ctrl+F5) — rodapé mostra
+        "Dados atualizados em dd/mm/aaaa às hh:mm"
+```
+
+### Backup — exportação manual de planilhas (só se o webhook parar)
+Colocar as 4 exportações em `Reports/` (o script pega a mais recente de cada padrão) e rodar
+`python scripts/extract.py --source excel`, depois build/commit/deploy como em §13.
 
 ---
 
@@ -360,19 +378,11 @@ OK CPL = investimento ÷ leads criados, AMBOS do período de criação — ignor
 
 ## 11. ROADMAP
 
-### Próximo: Integração Bitrix24 via MCP
-```
-Fluxo futuro:
-1. scripts/extract_bitrix.py conecta ao Bitrix24 via MCP
-2. Produz MESMO formato de saída que extract.py
-3. src/data/data.js permanece idêntico — nenhum componente muda
-4. constants/index.js: DATA_SOURCE = 'bitrix24'
+### ✅ Integração Bitrix24 via Webhook REST — em produção desde 2026-09-30 (§15)
 
-Endpoints Bitrix24:
-- crm.deal.list  → negócios
-- crm.category.list → pipelines (SDR/Closer/Rentabilização)
-- user.get       → responsáveis
-```
+### Possíveis próximos passos (não iniciar sem pedido do usuário)
+- Pipelines extras (Inner WhatsApp, Outbound PAP, Low-Ticket) — usuário decidiu deixar fora
+- Rodar a automação na nuvem (hoje depende do PC ligado/logado — §15.6)
 
 ---
 
@@ -441,9 +451,12 @@ Se divergir, o breakdown está perdendo ou duplicando registros:
 
 ## 13. DEPLOY
 
-### Fluxo completo
+> A atualização diária (§5, §15.8) já faz todo este fluxo sozinha para o `data.js`.
+> O fluxo manual abaixo vale para **mudanças de código** feitas numa sessão com o Claude.
+
+### Fluxo completo (manual)
 ```
-1. python scripts/extract.py     ← gera novo data.js
+1. python scripts/extract.py     ← gera novo data.js (Bitrix24)
 2. npm run build                 ← valida que compila sem erros
 3. git add <arquivos relevantes> ← nunca `git add -A`
 4. git commit -m "..."
@@ -549,4 +562,137 @@ lista muda no `extract.py`. Nunca duplicar essa lista no front.
 
 ---
 
-*Última atualização: Set/2026 | v4.8 — Rentabilização: fase de ganho renomeada para `8 - Venda Paga` (§3.3)*
+## 15. INTEGRAÇÃO BITRIX24 (WEBHOOK REST) — substitui as 4 planilhas do CRM
+
+> **Status (2026-09-30): EM PRODUÇÃO.** `scripts/bitrix_source.py` + `extract.py` (fonte padrão
+> `bitrix`) + `scripts/auto_update.py` agendado às 06:00. Planilhas exportadas = backup.
+
+### 15.1 Credencial
+- Inbound Webhook do Bitrix24, portal `tljmkt.bitrix24.com.br`, usuário **36649 (Gustavo Wandeur, ADMIN)**.
+- URL em `.env.local` → `BITRIX_WEBHOOK_URL=...` (gitignored). **Nunca** commitar, logar ou colar em
+  arquivo versionado — o repo é público e a URL dá acesso **total de administrador ao CRM**
+  (ler, alterar e apagar negócios, contatos, empresas). É mais sensível que o Deploy Hook.
+- Se `.env.local` não existir na sessão: pedir a URL ao usuário.
+- Escopo atual: só `crm`. `user.get` retorna `insufficient_scope` (ver §15.4).
+- **Regra do código:** o extrator só pode chamar métodos de leitura (`*.list`, `*.get`, `*.fields`).
+  Nunca `*.add`, `*.update`, `*.delete`.
+- Chamada: `POST {BITRIX_WEBHOOK_URL}{metodo}.json` com corpo JSON. Paginação de 50 em 50 —
+  usar `order: {ID: ASC}`, `filter: {'>ID': ultimo}`, `start: -1` (rápido, sem contagem).
+  Carga completa das 4 bases + empresas ≈ 100 s.
+
+### 15.2 Pipelines (crm.category.list, entityTypeId=2)
+| Planilha atual | CATEGORY_ID | Nome no Bitrix | Filtro que reproduz a planilha |
+|---|---|---|---|
+| BASE SDR | `0` | SDR | `>=DATE_MODIFY 2025-01-01` (**"MODIFICADO"** no nome do arquivo = modificado desde 2025) |
+| BASE CLOSER | `107` | Closer Comercial | nenhum (pipeline inteiro) |
+| BASE RENTABILIZAÇÃO | `103` | Rentabilização | nenhum |
+| BASE LICENÇAS | `129` | Licenças | nenhum |
+
+Existem outros pipelines **fora** do dashboard hoje: `113` Rentabilização Inner - WhatsApp,
+`133` Outbound - Visita PAP, `137` Vendas Low-Ticket, `119` CS Grupo, etc. Não incluir sem decisão do usuário.
+
+Nomes de fase: `crm.status.list` com `ENTITY_ID = DEAL_STAGE` (cat 0) ou `DEAL_STAGE_{cat}`.
+O campo `EXTRA.SEMANTICS` (`success`/`failure`/`apology`/`process`) é estável mesmo quando o
+Bitrix renomeia a fase — útil para detectar renames (ex: `C103:WON` = `8 - Venda Paga`).
+
+### 15.3 Mapeamento coluna da planilha → campo da API (validado registro a registro)
+| Coluna (Excel) | Campo API | Conversão |
+|---|---|---|
+| `ID` | `ID` | int |
+| `Nome do negócio` | `TITLE` | colapsar espaços duplos (a exportação Excel faz isso) |
+| `Fase` | `STAGE_ID` | → nome via `crm.status.list` |
+| `Criado` | `DATE_CREATE` | datetime: converter de UTC+3 (servidor) para `America/Sao_Paulo` |
+| `Data da mudança de etapa` | `MOVED_TIME` | idem `Criado` |
+| `Data de fechamento` | `CLOSEDATE` | ⚠️ **só data**: usar os 10 primeiros caracteres; converter fuso desloca 1 dia |
+| `[LC] Data de vencimento` | `UF_CRM_43_1709127323` | ⚠️ só data, idem |
+| `Renda` | `OPPORTUNITY` | float |
+| `Fonte` | `SOURCE_ID` | → nome via `crm.status.list ENTITY_ID=SOURCE`; se não mapear, manter o código cru (é o que o Excel mostra); vazio → nulo |
+| `Responsável` | `ASSIGNED_BY_ID` | → nome (ver §15.4) |
+| `#TLJ# SDR` | `UF_CRM_1731100890` | → nome (ver §15.4) |
+| `Empresa` | `COMPANY_ID` | → `TITLE` via `crm.company.list` (lotes de 50 IDs); strip |
+| `[SDR] Motivo de perda` | `UF_CRM_63DAB89F51656` | enum → texto via `crm.deal.fields` `items` |
+| `É renovação?` | `UF_CRM_1736878725444` | enum (`Sim`/`Não`) |
+| `[LC] Motivo de perda` | `UF_CRM_66E3304029CF4` | enum |
+| `[LC] Cliente está usando Bitrix?` | `UF_CRM_1777929842107` | enum **múltiplo** (lista) |
+
+⚠️ Não confundir com `UF_CRM_66D9B6C480F87` ("Motivo de perda errado não preencher") nem
+`UF_CRM_658C2C2CB2A06` ("Motivo de perda DELETAR") — campos antigos.
+
+### 15.4 Nomes de pessoas
+O webhook não tem escopo `user`, então a API devolve só o ID (ex: `67065`). Os 43 IDs em uso
+foram mapeados 1:1 para nomes a partir das planilhas de 30.09 → `scripts/bitrix_users.json`
+(versionado; os nomes já são públicos no data.js). O arquivo tem **prioridade** — mantém a
+grafia que o dashboard sempre usou.
+- ID sem nome no arquivo → `bitrix_source.resolve_users` tenta `user.get`; se o webhook tiver o
+  escopo **`user_brief`**, grava o nome no arquivo sozinho (o auto_update commita junto).
+- Sem o escopo → a pessoa aparece como `Usuário 12345` e o log registra AVISO. Correção:
+  acrescentar `"12345": "Nome Sobrenome"` no JSON, ou pedir ao desenvolvedor o escopo
+  `user_brief` (Bitrix → Aplicativos → Webhooks → editar → Permissões).
+
+### 15.5 Prova de equivalência (2026-09-30)
+Rodando o `extract.py` atual com os dados da API no lugar das planilhas de 30.09:
+- Contagem de registros idêntica (SDR 5.502 · Closer 1.290 · Rent 748+1 novo · LC 275)
+- **Todos os KPIs de Jan/25 a Jul/26 idênticos** (leads, vendas, receita, incrementos, ROI, PP)
+- Ago–Set/26: diferenças só de negócios movidos pelo time **depois** da exportação (API é ao vivo)
+- Após os ajustes abaixo: **Jan/25–Jul/26 idênticos campo a campo** (inclusive por fonte e
+  listas de detalhe) entre `--source bitrix` e `--source excel`.
+- Ajustes que tornaram a saída determinística (valem para as duas fontes):
+  - `_top()`: top-n de motivos/fontes com desempate por nome (antes dependia da ordem das linhas)
+  - `_vlookup_fonte`: empresa com várias vendas de fontes diferentes → vale a **mais recente**
+    (maior ID) — era o que a ordem da planilha (ID decrescente) fazia implicitamente
+  - Bitrix devolvido em ID decrescente, como a exportação
+
+### 15.6 Decisões do usuário (2026-09-30)
+1. **Pipelines extras** (Inner WhatsApp 113, Outbound PAP 133, Low-Ticket 137): **fora**, até segunda ordem.
+2. **Frequência:** automática, **todo dia às 06:00**, rodando **neste PC** (não na nuvem — o
+   link do Bitrix não sai do computador e a planilha de investimentos fica em `Reports/`).
+3. **Investimentos:** continuam em `Reports/INVESTIMENTOS.xlsx`, mesmo formato.
+4. **Planilhas exportadas:** mantidas só como backup (`--source excel`).
+5. **Mês em andamento:** o dashboard abre no **último mês fechado**; o mês corrente aparece
+   como "(parcial)"; sem investimento lançado → "Aguardando investimento" (§15.7).
+6. Pendente com o desenvolvedor (opcional): escopo `user_brief` e webhook de usuário só-leitura.
+
+### 15.7 Mês em andamento e investimento pendente
+`extract.py` marca cada mês de `DATA`/`DATA_TERMINO` com:
+- `parcial: true` → mês corrente (fuso São Paulo). `ALL_MONTHS` vai de Jan/25 até o mês
+  corrente **automaticamente** — não há mais lista de meses para editar.
+- `inv_pendente: true` → mês sem coluna (ou com 0) em INVESTIMENTOS.xlsx.
+
+Front (`src/utils/months.js`):
+- `App.jsx` abre em `LAST_CLOSED` (6 meses até ele no filtro "Criado em").
+- Séries fixas de 6 meses (`LAST6_RAW`, Tabela de Investimentos) usam só meses fechados.
+- `CURR.inv_pendente` = algum mês do período sem investimento → Tab6 mostra "—" /
+  "Aguardando investimento" em Total Investido, ROI, Lucro Bruto, CAC, CPL e Leads/R$1k;
+  `alertEngine` não dispara alertas de ROI/CPL; gráficos recebem `null` (pulam o ponto).
+- PeriodSelector: rótulo "Out/26 (parcial)", atalhos "Mês em andamento" e "Último mês fechado".
+- Rodapé: "Dados atualizados em dd/mm/aaaa às hh:mm" (`ATUALIZADO_EM` do data.js).
+
+### 15.8 Automação diária (`scripts/auto_update.py`)
+- Tarefa do Windows **`TLJ Dashboard - Atualizacao diaria`**, 06:00, criada por
+  `scripts/registrar_agendamento.ps1` (rodar de novo recria/atualiza). Usa `pythonw` (sem janela),
+  acorda o PC se estiver dormindo, roda ao ligar se o PC estava desligado, só com o usuário
+  logado (usa as credenciais do Git do Windows para o push).
+- Passos: espera internet (até 10 min) → `git fetch`/`pull --rebase` → `extract.main('bitrix')`
+  → travas → se os dados não mudaram, para → `npm run build` → `git commit -- src/data/data.js
+  [scripts/bitrix_users.json]` → push → Deploy Hook.
+- **Travas (se qualquer uma falhar, NÃO publica)**:
+  1. `check_bitrix_schema` (extract.py): usa a SEMÂNTICA das fases (success/failure/apology),
+     que o Bitrix mantém quando alguém renomeia uma etapa. Fase de perda do SDR fora de
+     `FASES_PERDIDO_SDR`, ganho do Closer ≠ `Venda - Ganho`, ganho da Rentabilização fora de
+     `FASES_GANHO_RENT`, fases de Licenças fora dos sets, ou motivo de `MOTIVOS_NAO_EFETIVOS`
+     inexistente → `SchemaError`. Campo personalizado sumido → `BitrixError`.
+  2. Coerência §8/§12 em todos os meses (totais, reuniões, efetivos, somas por fonte).
+  3. Queda >10% no nº de registros de qualquer base vs última execução boa (`logs/estado.json`),
+     ou >10% no total de leads / receita dos meses fechados antigos vs o data.js publicado.
+- Falha → `data.js` restaurado, erro em `logs/auto_update.log`, notificação do Windows
+  ("Dashboard TLJ: atualização falhou"). O site segue com a última atualização boa.
+  Push falhou depois do commit → a próxima execução reenvia.
+- Commits automáticos: `data: atualização automática dd/mm/aaaa hh:mm (Bitrix24)` — só data.js.
+- Testar sem publicar: `python scripts/auto_update.py --dry-run`.
+- Ver a tarefa: `Get-ScheduledTask -TaskName 'TLJ Dashboard - Atualizacao diaria' | Get-ScheduledTaskInfo`.
+
+---
+
+*Última atualização: Set/2026 | v5.0 — Atualização automática diária via Bitrix24 (§5, §15)*
+
+*Anterior: v4.8 — Rentabilização: fase de ganho renomeada para `8 - Venda Paga` (§3.3)*
