@@ -688,6 +688,16 @@ Front (`src/utils/months.js`):
   ("Dashboard TLJ: atualização falhou"). O site segue com a última atualização boa.
   Push falhou depois do commit → a próxima execução reenvia.
 - Commits automáticos: `data: atualização automática dd/mm/aaaa hh:mm (Bitrix24)` — só data.js.
+- **GitHub sem janela de login:** o Gerenciador de Credenciais do Windows tem 2 contas GitHub
+  (`MarketingTLJ` e `bmatheus1234-lab`). Sem conta fixada, o GCM abre janela "qual conta?" —
+  invisível sob pythonw — e o push trava (incidente de 01/10/2026). O auto_update fixa
+  `credential.https://github.com.username = MarketingTLJ` no repo e roda o git com
+  `GCM_INTERACTIVE=never` (falha na hora em vez de travar). `logs/estado.json` guarda
+  `deployed_commit`: se um deploy ficou pendente, a execução seguinte dispara.
+- **Horário real:** o notebook usa *Modern Standby* (S0) e, com a tampa fechada, normalmente
+  **não acorda às 06:00** (em 01/10 dormiu 22:35 → abriu 08:09). Aí a tarefa roda sozinha
+  logo que o PC é aberto (`StartWhenAvailable`) — ~3 min depois o site está atualizado.
+  Para garantir 06:00: deixar ligado na tomada sem suspender, ou migrar para a nuvem.
 - Testar sem publicar: `python scripts/auto_update.py --dry-run`.
 - Ver a tarefa: `Get-ScheduledTask -TaskName 'TLJ Dashboard - Atualizacao diaria' | Get-ScheduledTaskInfo`.
 
