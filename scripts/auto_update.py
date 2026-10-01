@@ -74,10 +74,20 @@ def notify(title, text):
 
 
 # ── Utilitários ───────────────────────────────────────────────────────────────
+# Nunca abrir janela de login/escolha de conta: sem console (pythonw) ninguém vê e o git
+# trava (foi o que aconteceu em 01/10/2026 — 2 contas GitHub no Gerenciador de Credenciais).
+# Com isso o git falha na hora em vez de travar.
+GIT_ENV = {**os.environ, 'GCM_INTERACTIVE': 'never', 'GIT_TERMINAL_PROMPT': '0'}
+GITHUB_ACCOUNT = 'MarketingTLJ'
+
+
 def run(cmd, timeout=600, check=True):
     exe = shutil.which(cmd[0]) or cmd[0]
-    r = subprocess.run([exe, *cmd[1:]], cwd=ROOT, capture_output=True, text=True,
-                       encoding='utf-8', errors='replace', timeout=timeout, creationflags=NO_WINDOW)
+    try:
+        r = subprocess.run([exe, *cmd[1:]], cwd=ROOT, capture_output=True, text=True, env=GIT_ENV,
+                           encoding='utf-8', errors='replace', timeout=timeout, creationflags=NO_WINDOW)
+    except subprocess.TimeoutExpired:
+        raise Abort(f"{' '.join(cmd)} não respondeu em {timeout}s")
     if check and r.returncode != 0:
         raise Abort(f"{' '.join(cmd)} falhou (código {r.returncode}):\n{(r.stdout + r.stderr)[-1500:]}")
     return r
@@ -137,7 +147,7 @@ def check_coherence(new):
 
 def check_vs_previous(new, old, counts):
     """Queda brusca = provável problema de extração (ex: fase renomeada, filtro quebrado)."""
-    prev = json.loads(STATE.read_text(encoding='utf-8')) if STATE.exists() else {}
+    prev = load_state()
     for k, n in counts.items():
         p = prev.get('counts', {}).get(k)
         if p and n < 0.9 * p:
@@ -163,6 +173,10 @@ def git_sync():
     branch = run(['git', 'rev-parse', '--abbrev-ref', 'HEAD']).stdout.strip()
     if branch != 'main':
         raise Abort(f"Repositório está no branch '{branch}', não em 'main' — não publico")
+    # Fixa a conta do GitHub deste repositório (evita a janela "qual conta?")
+    if run(['git', 'config', '--local', '--get', 'credential.https://github.com.username'],
+           check=False).stdout.strip() != GITHUB_ACCOUNT:
+        run(['git', 'config', '--local', 'credential.https://github.com.username', GITHUB_ACCOUNT])
     run(['git', 'fetch', 'origin', 'main'], timeout=120)
     behind = int(run(['git', 'rev-list', '--count', 'HEAD..origin/main']).stdout.strip() or 0)
     if behind:
@@ -172,15 +186,37 @@ def git_sync():
     return int(run(['git', 'rev-list', '--count', 'origin/main..HEAD']).stdout.strip() or 0)
 
 
+def head():
+    return run(['git', 'rev-parse', 'HEAD']).stdout.strip()
+
+
+def remote_has_head():
+    r = run(['git', 'ls-remote', 'origin', 'refs/heads/main'], timeout=60, check=False)
+    return r.returncode == 0 and r.stdout.split()[:1] == [head()]
+
+
 def git_push():
-    """GitHub às vezes devolve 403/5xx passageiro (visto em 2026-09-30) — tenta 3x."""
+    """GitHub às vezes devolve 403/5xx passageiro (visto em 2026-09-30) — tenta 3x.
+    Se o push "falhar" mas o commit já estiver no GitHub (visto em 01/10), segue."""
     for attempt in range(3):
         try:
             return run(['git', 'push', 'origin', 'main'], timeout=180)
         except Abort:
+            if remote_has_head():
+                log("  push reportou erro, mas o commit já está no GitHub — seguindo")
+                return
             if attempt == 2:
                 raise
             time.sleep(30)
+
+
+def load_state():
+    return json.loads(STATE.read_text(encoding='utf-8')) if STATE.exists() else {}
+
+
+def save_state(**kw):
+    st = {**load_state(), **kw, 'ok_em': datetime.now().isoformat()}
+    STATE.write_text(json.dumps(st), encoding='utf-8')
 
 
 def wait_for_network(max_wait=600):
@@ -249,11 +285,16 @@ def main(dry_run=False):
         if strip_timestamp(new_text) == strip_timestamp(old_text):
             log("Sem mudanças nos dados desde a última publicação — nada a publicar")
             DATA_JS.write_text(old_text, encoding='utf-8')
-            if ahead and not dry_run:
-                log(f"  Enviando {ahead} commit(s) pendente(s) de execução anterior + deploy")
-                git_push()
-                deploy()
-            STATE.write_text(json.dumps({'counts': res['counts'], 'ok_em': datetime.now().isoformat()}), encoding='utf-8')
+            if not dry_run:
+                # Pendência de execução anterior: commit não enviado ou deploy não disparado
+                if ahead:
+                    log(f"  Enviando {ahead} commit(s) pendente(s) de execução anterior")
+                    git_push()
+                if load_state().get('deployed_commit') != head():
+                    log("  Último commit ainda sem deploy confirmado — disparando Deploy Hook")
+                    deploy()
+                    save_state(deployed_commit=head())
+            save_state(counts=res['counts'])
             return 0
 
         log("4/6 Build (npm run build)")
@@ -278,7 +319,7 @@ def main(dry_run=False):
 
         log("6/6 Disparando deploy (Vercel Deploy Hook)")
         deploy()
-        STATE.write_text(json.dumps({'counts': res['counts'], 'ok_em': datetime.now().isoformat()}), encoding='utf-8')
+        save_state(counts=res['counts'], deployed_commit=head())
         log(f"CONCLUÍDO em {time.time() - started:.0f}s — site atualiza em 1-3 min")
         return 0
 
