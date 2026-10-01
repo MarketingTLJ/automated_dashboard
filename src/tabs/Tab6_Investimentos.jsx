@@ -1,6 +1,8 @@
 ﻿import { SectionHeader } from '../components/ui/SectionHeader.jsx';
 import { KpiCard } from '../components/ui/KpiCard.jsx';
 import { InvestmentTable } from '../components/ui/InvestmentTable.jsx';
+import { EventoNote } from '../components/ui/EventoNote.jsx';
+import { getEventNotes } from '../utils/eventos.js';
 import { RoiCplComposed } from '../components/charts/RoiCplComposed.jsx';
 import { RevenueInvestmentTrend } from '../components/charts/RevenueInvestmentTrend.jsx';
 import { fmt, fmtK } from '../utils/formatters.js';
@@ -10,7 +12,7 @@ export function Tab6_Investimentos({
   CURR, PREV, trend6, N6, last6,
   investRevenueVendas, investRevenueVendasInc,
   investRevenueVendasPrevYear, investRevenueVendasIncPrevYear,
-  isRange,
+  filtered, filteredTermino, isRange,
 }) {
   if (!CURR) return null;
 
@@ -23,10 +25,13 @@ export function Tab6_Investimentos({
       <SectionHeader number={6} title="Investimentos & ROI"
         subtitle={isRange ? `Eficiência de mídia · ${CURR.label}` : `Eficiência de mídia · ${CURR.label} vs período`} />
 
+      {/* Comentário de evento (verba destinada ao evento no mês) — CLAUDE.md §16 */}
+      <EventoNote notes={getEventNotes(filtered, filteredTermino)} />
+
       {/* KPIs — row 1 */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-4">
         {pend ? <KpiCard title="Total Investido" {...PEND} icon="📢" /> : (
-        <KpiCard title="Total Investido" value={fmt(CURR.inv)} sub="Google + Meta + WhatsApp"
+        <KpiCard title="Total Investido" value={fmt(CURR.inv)} sub="Google + Meta + WhatsApp + Outros"
           curr={CURR.inv} prev={PREV?.inv} color={COLORS.brandBlueLight} icon="📢" inv />)}
         {pend ? <KpiCard title="ROI Líquido" {...PEND} icon="📈" /> : (
         <KpiCard title="ROI Líquido" value={`${CURR.roi}x`} sub="Lucro Bruto ÷ Investimento"

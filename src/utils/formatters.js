@@ -3,6 +3,10 @@ export const fmt = v =>
     style: 'currency', currency: 'BRL', maximumFractionDigits: 0,
   }).format(v || 0);
 
+// Com centavos — valores exatos de investimento (ex: comentário de evento)
+export const fmtCents = v =>
+  new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(v || 0);
+
 export const fmtK = v => (v >= 1000 ? `R$${(v / 1000).toFixed(0)}k` : fmt(v));
 
 export const pct = (a, b) => (b > 0 ? ((a / b) * 100).toFixed(1) + '%' : '—');

@@ -141,8 +141,10 @@ O `extract.py` busca a `Fonte` de cada negócio de Rentabilização pelo campo `
 Arquivo: `INVESTIMENTOS.xlsx`
 
 - Linha 5 (índice) = `Total Investido Mês`
-- Colunas: `'jan/25', 'fev/25', ..., 'mai/26'`
-- `abr/26` está ausente (inv=0 para Abr/26)
+- **Última linha** = `Total Investido Mês` (fórmula `=SUM` das linhas acima — linha nova de canal
+  tem de ficar ACIMA dela e dentro da soma). As demais linhas viram o "Investimento por Canal".
+- Colunas: `'jan/25', 'fev/25', ...` (cabeçalho `mmm/aa` minúsculo)
+- Linha `Outros` (desde Set/26) = verba de eventos (§16)
 
 ---
 
@@ -156,7 +158,7 @@ Arquivo: `INVESTIMENTOS.xlsx`
 
 | Métrica | Filtro | Fórmula |
 |---------|--------|---------|
-| Total Leads | `Criado` no mês | SDR criados + Closer criados |
+| Total Leads | `Criado` no mês | SDR criados + Closer criados + **Eventos** (fontes de `EVENTOS`, §16) |
 | **Leads Efetivos** | `Criado` no mês | `leads_total − leads_descartados` — ver §14 |
 | Reuniões | `Criado` no mês | = `leads_closer` |
 | Qtd Vendas (qtd_v) | `Data de fechamento` + Fase=Ganho | Closer |
@@ -306,7 +308,7 @@ Tabs recebem `isRange` via props — nunca recalcular localmente.
 ## 8. VALIDAÇÕES OBRIGATÓRIAS
 
 ```
-OK Total Leads = SDR criados + Closer criados no mês (campo Criado)
+OK Total Leads = SDR criados + Closer criados + Eventos (§16) no mês (campo Criado)
 OK Reuniões = exatamente o total de Closer criados (campo Criado)
 OK Qtd Vendas = Closer com dt_fech no mês E Fase=Ganho
 OK Taxa Conv. Geral = Contratos (por fechamento) ÷ Total Leads (por criação)
@@ -408,7 +410,7 @@ Quando o usuário seleciona "Fontes Pagas", o array inclui `'__pagas__'`.
 `expandFontes()` no hook expande esse sentinela para todos os nomes em `FONTES_PAGAS`.
 
 ### Escopo V3 (o que é filtrado) — atualizado 2026-08-29
-- `leads_sdr`, `leads_closer`, `leads_total`, `reunioes`
+- `leads_sdr`, `leads_closer`, `leads_eventos` (§16), `leads_total`, `reunioes`
 - `qtd_v`, `rec_v`, `qtd_i`, `rec_i`, `qtd_r`, `rec_r`
 - Derivados: `ticket`, `roi`, `cac`, `cpl`, `lucro_bruto`
 - `fonte_sdr` (distribuição por fonte no Tab4)
@@ -703,6 +705,48 @@ Front (`src/utils/months.js`):
 
 ---
 
-*Última atualização: Set/2026 | v5.0 — Atualização automática diária via Bitrix24 (§5, §15)*
+## 16. LEADS DE EVENTOS (pipeline "Eventos & Inscritos")
+
+> Decisões do usuário em 2026-10-01 — **não alterar sem confirmação**.
+
+- **Origem:** pipeline `127 Eventos & Inscritos` do Bitrix, mas **só os negócios cujas fontes
+  estão em `EVENTOS`** (`extract.py`). Os negócios antigos do pipeline (Jan/26 "Cadastro manual",
+  Jun/26 "Network") ficam **fora** — usuário escolheu "só fonte Cockpit Website".
+- **Linha própria:** `leads_eventos` soma em `leads_total` (e portanto em Leads Efetivos, CPL e
+  Taxa Conv. Geral), mas **não** em `leads_sdr`/`leads_closer` nem nos indicadores do time SDR
+  (Em Andamento, Perdidos, taxa de perda, tabela por responsável). `reunioes` segue = Closer.
+- **Fases** (pela semântica do Bitrix): `failure`/`apology` (PERDIDO, Testes) = perdido
+  (`eventos_perdido`; descontado de efetivos só se o motivo estiver em `MOTIVOS_NAO_EFETIVOS`);
+  o resto (Novo, Incritos, Ativo, Está no Grupo) = em andamento (`eventos_ativo`).
+  **"VENDA REALIZADA" NÃO conta como venda** — vendas/receita vêm só do Closer (evita duplicar).
+- **Por fonte:** `por_fonte[f].leads_eventos/eventos_ativo/eventos_perdido`; "Cockpit Website" é
+  fonte paga (FontesPagas.xlsx + `FONTES_PAGAS` em constants) → entra no filtro "Fontes Pagas".
+- **DATA_TERMINO não muda** (eventos não têm data de fechamento).
+- **Comentário do mês:** `EVENTOS` vai para o data.js; `utils/eventos.js` + `ui/EventoNote.jsx`
+  mostram a faixa "📌 … Investimento em evento" nas abas **Resumo Executivo e Investimentos**
+  sempre que o mês do evento estiver em algum dos períodos selecionados. Valor = linha
+  `canal_investimento` de INVESTIMENTOS.xlsx no mês; leads = `por_fonte[fonte]` (sem filtro).
+  A aba Análise SDR mostra o bloco "🎟️ Leads de Eventos"; o Funil mostra "+ N Eventos".
+- **Trava:** fonte de `EVENTOS` inexistente no Bitrix → `SchemaError` (não publica).
+- **Backup Excel** (`--source excel`) não tem esse pipeline → eventos ficam de fora (AVISO no log).
+
+### Eventos cadastrados
+| Mês | Evento | Fonte | Linha de investimento | Referência (01/10/2026) |
+|---|---|---|---|---|
+| Set/26 | Lançamento do Cockpit AI (Live 28/09) | Cockpit Website | `Outros` (R$ 2.886,89) | 88 leads: 83 Incritos + 4 Novo + 1 PERDIDO |
+
+Set/26 com o evento: 207 SDR + 40 Closer + 88 Eventos = **335 leads** · 252 efetivos · CPL R$ 37,66.
+(Em Set/26 a verba do evento saiu de "Meta Ads Grupo" para "Outros"; total do mês ≈ igual.)
+
+### Novo evento
+1. Acrescentar item em `EVENTOS` (`extract.py`): `ym`, `nome`, `fonte`, `canal_investimento`
+2. Se a fonte for paga: marcar em `Reports/FontesPagas.xlsx` e em `FONTES_PAGAS` (constants)
+3. Lançar a verba na linha correspondente de `INVESTIMENTOS.xlsx` (dentro do Total)
+
+---
+
+*Última atualização: Out/2026 | v5.1 — Leads de Eventos (§16): Lançamento do Cockpit AI*
+
+*Anterior: v5.0 — Atualização automática diária via Bitrix24 (§5, §15)*
 
 *Anterior: v4.8 — Rentabilização: fase de ganho renomeada para `8 - Venda Paga` (§3.3)*

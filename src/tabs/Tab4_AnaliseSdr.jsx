@@ -7,12 +7,14 @@ import { pct } from '../utils/formatters.js';
 import { THR, COLORS, THR_PERDA_SDR } from '../constants/index.js';
 import { MOTIVOS_NAO_EFETIVOS } from '../data/data.js';
 import { sdrRespToArr } from '../utils/respToArray.js';
+import { getEventNotes } from '../utils/eventos.js';
 
 export function Tab4_AnaliseSdr({ CURR, PREV, filtered, isRange }) {
   const [sel, setSel] = useState(null);
   if (!CURR) return null;
 
   const sdrArr = sdrRespToArr(CURR.sdr_resp);
+  const eventNotes = getEventNotes(filtered);
 
   const fonteSd = Object.entries(CURR.fonte_sdr || {})
     .map(([name, value]) => ({ name, value }))
@@ -26,7 +28,8 @@ export function Tab4_AnaliseSdr({ CURR, PREV, filtered, isRange }) {
       {/* KPIs */}
       <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-4 mb-3">
         <KpiCard title="Total Leads Gerados" value={CURR.leads_total}
-          sub={`SDR ${CURR.leads_sdr} + Closer ${CURR.leads_closer}`}
+          sub={`SDR ${CURR.leads_sdr} + Closer ${CURR.leads_closer}`
+            + (CURR.leads_eventos > 0 ? ` + Eventos ${CURR.leads_eventos}` : '')}
           curr={CURR.leads_total} prev={PREV?.leads_total} color={COLORS.leads} icon="🎯" />
         <KpiCard title="Total Leads Efetivos" value={CURR.leads_efetivos}
           sub={pct(CURR.leads_efetivos, CURR.leads_total) + ' dos leads gerados'}
@@ -49,7 +52,7 @@ export function Tab4_AnaliseSdr({ CURR, PREV, filtered, isRange }) {
         </p>
         <p className="text-gray-600 text-xs leading-relaxed">
           São as <strong>oportunidades reais</strong> do período: todos os leads gerados
-          (SDR + Closer) <strong>menos</strong> as perdas de leads que nunca chegaram a ser
+          (SDR + Closer + Eventos) <strong>menos</strong> as perdas de leads que nunca chegaram a ser
           trabalhados. Ficam de fora as perdas com motivo{' '}
           {MOTIVOS_NAO_EFETIVOS.map((m, i) => (
             <span key={m}>
@@ -67,6 +70,31 @@ export function Tab4_AnaliseSdr({ CURR, PREV, filtered, isRange }) {
           {' '}({pct(CURR.leads_efetivos, CURR.leads_total)} do total).
         </p>
       </div>
+
+      {/* Leads de Eventos — linha própria, fora dos indicadores do time SDR (CLAUDE.md §16) */}
+      {CURR.leads_eventos > 0 && (
+        <div className="glass-card rounded-2xl p-4 mb-7 border-l-4" style={{ borderLeftColor: COLORS.eventos }}>
+          <p className="text-gray-900 text-xs font-semibold mb-1.5">
+            🎟️ <span style={{ color: COLORS.eventos }}>Leads de Eventos</span>
+            {' '}— {[...new Set(eventNotes.map(n => n.nome))].join(' · ') || 'pipeline Eventos & Inscritos'}
+          </p>
+          <p className="text-gray-600 text-xs leading-relaxed">
+            <strong className="text-gray-800">{CURR.leads_eventos}</strong> leads
+            {eventNotes.length > 0 && <> (fonte {[...new Set(eventNotes.map(n => n.fonte))].join(', ')})</>}:{' '}
+            <strong style={{ color: COLORS.ganho }}>{CURR.eventos_ativo}</strong> em andamento ·{' '}
+            <strong style={{ color: COLORS.perdido }}>{CURR.eventos_perdido}</strong> perdido{CURR.eventos_perdido === 1 ? '' : 's'}
+            {Object.keys(CURR.eventos_fases || {}).length > 0 && (
+              <span className="text-gray-500">
+                {' '}(fases: {Object.entries(CURR.eventos_fases).map(([f, n]) => `${f} ${n}`).join(' · ')})
+              </span>
+            )}.
+          </p>
+          <p className="text-gray-500 text-xs mt-2">
+            Contam como leads pagos em <strong>Leads Gerados</strong> e <strong>Leads Efetivos</strong>,
+            mas não entram nos indicadores do time SDR (Em Andamento, Perdidos e tabela por responsável).
+          </p>
+        </div>
+      )}
 
       {/* SDR table */}
       <div className="glass-card rounded-2xl mb-5 overflow-auto">

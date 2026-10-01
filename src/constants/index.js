@@ -13,6 +13,7 @@ export const COLORS = {
   renovacoes:  '#0e7490',  // renewals — teal-700 (variation of cpl cyan, darker)
   leads:       '#60a5fa',  // leads — soft blue
   leadsEfetivos: '#7c3aed', // leads efetivos — violet-600 (oportunidades reais)
+  eventos:     '#d97706',  // leads de eventos — amber-600 (linha própria, §16)
   reunioes:    '#2563eb',  // meetings — blue-600 (variation of leads, darker)
   ganho:       '#22c55e',  // won — green
   perdido:     '#E31E24',  // lost — brand red
@@ -58,7 +59,7 @@ export const TABS = [
 // ── Fontes consideradas pagas (origem: Reports/FontesPagas.xlsx) ──────────────
 // Sincronizar com extract.py ao atualizar FontesPagas.xlsx
 export const FONTES_PAGAS = [
-  'Agendamento on-line', 'E-mail Marketing', 'Facebook Ads', 'Google Ads',
+  'Agendamento on-line', 'Cockpit Website', 'E-mail Marketing', 'Facebook Ads', 'Google Ads',
   'JotForm', 'Linkedin', 'Nutrição', 'Redes sociais', 'Tiktok', 'Tiktok Ads',
   'Whatsapp API TLJ', 'Whatsapp Massivo API', 'Youtube', 'Youtube Ads',
 ];

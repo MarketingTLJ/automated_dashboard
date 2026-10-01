@@ -25,6 +25,8 @@ TZ         = 'America/Sao_Paulo'
 # Pipelines do dashboard (crm.category.list, entityTypeId=2). Outros pipelines
 # (Inner WhatsApp 113, Outbound PAP 133, Low-Ticket 137...) ficam FORA por decisão do usuário.
 CAT_SDR, CAT_CLOSER, CAT_RENT, CAT_LC = 0, 107, 103, 129
+# Eventos & Inscritos — baixado inteiro; o extract.py só usa as fontes de EVENTOS (CLAUDE.md §16)
+CAT_EVENTOS = 127
 
 # A planilha "BASE SDR - MODIFICADO 2025 a ..." = negócios SDR modificados desde 2025.
 SDR_MODIFIED_SINCE = '2025-01-01T00:00:00-03:00'
@@ -174,6 +176,8 @@ def _to_df(rows, ctx) -> pd.DataFrame:
         'ID':                       df['ID'].astype(int),
         'Nome do negócio':          _ws(df['TITLE']),
         'Fase':                     df['STAGE_ID'].map(ctx['stages']),
+        # process / success / failure / apology — estável mesmo se a fase for renomeada
+        'FaseSem':                  df['STAGE_ID'].map(ctx['semantics']),
         'Criado':                   _dtime(df['DATE_CREATE']),
         'Data de fechamento':       _ddate(df['CLOSEDATE']),
         'Data da mudança de etapa': _dtime(df['MOVED_TIME']),
@@ -200,8 +204,8 @@ def _to_df(rows, ctx) -> pd.DataFrame:
 def load_raw_frames(log=print) -> dict:
     """
     Baixa tudo do Bitrix e devolve:
-      {'sdr','closer','rent','lics': DataFrame, 'stages': {cat: [...]},
-       'enums': {...}, 'users_missing': [...], 'counts': {...}}
+      {'sdr','closer','rent','lics','eventos': DataFrame, 'stages': {cat: [...]},
+       'enums': {...}, 'sources': {nomes}, 'users_missing': [...], 'counts': {...}}
     """
     t0 = time.time()
     fields = _result('crm.deal.fields')
@@ -210,24 +214,30 @@ def load_raw_frames(log=print) -> dict:
             raise BitrixError(f"Campo {code} não existe mais no Bitrix — revalidar mapeamento (CLAUDE.md §15.3)")
     enums = {c: _enum(fields, c) for c in (UF_MOTIVO_SDR, UF_RENOVACAO, UF_LC_MOTIVO, UF_LC_BITRIX)}
 
-    stages_by_cat = {cat: fetch_stages(cat) for cat in (CAT_SDR, CAT_CLOSER, CAT_RENT, CAT_LC)}
-    stages = {s['STATUS_ID']: s['NAME'] for lst in stages_by_cat.values() for s in lst}
+    cats = (CAT_SDR, CAT_CLOSER, CAT_RENT, CAT_LC, CAT_EVENTOS)
+    stages_by_cat = {cat: fetch_stages(cat) for cat in cats}
+    stages    = {s['STATUS_ID']: s['NAME'] for lst in stages_by_cat.values() for s in lst}
+    semantics = {s['STATUS_ID']: s['SEMANTICS'] for lst in stages_by_cat.values() for s in lst}
     sources = {s['STATUS_ID']: s['NAME'] for s in _result('crm.status.list', {'filter': {'ENTITY_ID': 'SOURCE'}})}
 
     log("  Baixando negócios do Bitrix...")
     raw = {
-        'sdr':    fetch_deals({'CATEGORY_ID': CAT_SDR, '>=DATE_MODIFY': SDR_MODIFIED_SINCE}),
-        'closer': fetch_deals({'CATEGORY_ID': CAT_CLOSER}),
-        'rent':   fetch_deals({'CATEGORY_ID': CAT_RENT}),
-        'lics':   fetch_deals({'CATEGORY_ID': CAT_LC}),
+        'sdr':     fetch_deals({'CATEGORY_ID': CAT_SDR, '>=DATE_MODIFY': SDR_MODIFIED_SINCE}),
+        'closer':  fetch_deals({'CATEGORY_ID': CAT_CLOSER}),
+        'rent':    fetch_deals({'CATEGORY_ID': CAT_RENT}),
+        'lics':    fetch_deals({'CATEGORY_ID': CAT_LC}),
+        'eventos': fetch_deals({'CATEGORY_ID': CAT_EVENTOS}),
     }
     companies = fetch_companies(r.get('COMPANY_ID') for rows in raw.values() for r in rows)
+    # Eventos não aparecem em tabelas por pessoa — não exigem nome em bitrix_users.json
     users, users_missing = resolve_users(
-        r.get(k) for rows in raw.values() for r in rows for k in ('ASSIGNED_BY_ID', UF_TLJ_SDR))
+        r.get(k) for name, rows in raw.items() if name != 'eventos'
+        for r in rows for k in ('ASSIGNED_BY_ID', UF_TLJ_SDR))
 
-    ctx = {'stages': stages, 'sources': sources, 'companies': companies, 'users': users, 'enums': enums}
+    ctx = {'stages': stages, 'semantics': semantics, 'sources': sources,
+           'companies': companies, 'users': users, 'enums': enums}
     frames = {k: _to_df(v, ctx) for k, v in raw.items()}
     counts = {k: len(v) for k, v in frames.items()}
     log(f"  Bitrix: {counts} · {len(companies)} empresas · {time.time() - t0:.0f}s")
-    return {**frames, 'stages': stages_by_cat, 'enums': enums,
+    return {**frames, 'stages': stages_by_cat, 'enums': enums, 'sources': set(sources.values()),
             'users_missing': users_missing, 'counts': counts}

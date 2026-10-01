@@ -1,5 +1,7 @@
 import { DeltaBadge } from '../components/ui/DeltaBadge.jsx';
 import { AlertBanner } from '../components/ui/AlertBanner.jsx';
+import { EventoNote } from '../components/ui/EventoNote.jsx';
+import { getEventNotes } from '../utils/eventos.js';
 import { InvestmentTable } from '../components/ui/InvestmentTable.jsx';
 import { RevenueStackedBar } from '../components/charts/RevenueStackedBar.jsx';
 import { ConversionRateBar } from '../components/charts/ConversionRateBar.jsx';
@@ -180,6 +182,9 @@ export function Tab0_ResumoExecutivo({
           </div>
         </div>
       </div>
+
+      {/* Comentário de evento (ex: Lançamento do Cockpit AI em Set/26) — CLAUDE.md §16 */}
+      <EventoNote notes={getEventNotes(filtered, filteredTermino)} />
 
       {/* Tabela de Investimentos */}
       <div className="mb-7">
