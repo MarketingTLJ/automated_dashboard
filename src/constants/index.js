@@ -13,7 +13,6 @@ export const COLORS = {
   renovacoes:  '#0e7490',  // renewals — teal-700 (variation of cpl cyan, darker)
   leads:       '#60a5fa',  // leads — soft blue
   leadsEfetivos: '#7c3aed', // leads efetivos — violet-600 (oportunidades reais)
-  eventos:     '#d97706',  // leads de eventos — amber-600 (linha própria, §16)
   reunioes:    '#2563eb',  // meetings — blue-600 (variation of leads, darker)
   ganho:       '#22c55e',  // won — green
   perdido:     '#E31E24',  // lost — brand red

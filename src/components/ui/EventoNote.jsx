@@ -20,8 +20,9 @@ export function EventoNote({ notes }) {
                     foram destinados ao evento (linha “{n.canal_investimento}” da planilha de investimentos).
                   </>}{' '}
               O evento gerou <strong>{n.leads} leads</strong> (fonte {n.fonte}
-              {n.leads > 0 && ` — ${n.ativo} em andamento, ${n.perdido} perdido${n.perdido === 1 ? '' : 's'}`}),
-              {' '}contabilizados nos Leads Totais do mês como leads pagos.
+              {n.leads > 0 && ` — ${n.ativo} em andamento, ${n.perdido} perdido${n.perdido === 1 ? '' : 's'}`}
+              {n.reuniao > 0 && `, ${n.reuniao} com reunião realizada`}),
+              {' '}trabalhados no pipeline SDR e contabilizados nos Leads Totais do mês do evento como leads pagos.
             </p>
           </div>
         );

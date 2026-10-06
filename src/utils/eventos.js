@@ -1,7 +1,8 @@
 import { DATA, EVENTOS } from '../data/data.js';
 
 // Comentário de evento por mês (CLAUDE.md §16). A lista EVENTOS vem do extract.py;
-// verba = linha `canal_investimento` de INVESTIMENTOS.xlsx no mês; leads = fonte do evento.
+// verba = linha `canal_investimento` de INVESTIMENTOS.xlsx no mês; leads = SDR + Closer da
+// fonte do evento (as cópias no SDR já são contadas no mês do evento pelo extract.py).
 // Usa o mês SEM filtro de fonte, para o comentário sempre mostrar o evento inteiro.
 const BY_YM = new Map(DATA.map(d => [d.ym, d]));
 
@@ -21,9 +22,11 @@ export function getEventNotes(...periods) {
         invTotal:    d.inv,
         invPendente: !!d.inv_pendente,
         sharePct:    !d.inv_pendente && d.inv > 0 ? Math.round((valor / d.inv) * 100) : null,
-        leads:       pf.leads_eventos   || 0,
-        ativo:       pf.eventos_ativo   || 0,
-        perdido:     pf.eventos_perdido || 0,
+        leads:       (pf.leads_sdr || 0) + (pf.leads_closer || 0),
+        ativo:       pf.sdr_ativo   || 0,
+        perdido:     pf.sdr_perdido || 0,
+        // SDR em 'Reunião Realizada' (nem ativo nem perdido) — o lead avançou
+        reuniao:     Math.max((pf.leads_sdr || 0) - (pf.sdr_ativo || 0) - (pf.sdr_perdido || 0), 0),
       };
     });
 }

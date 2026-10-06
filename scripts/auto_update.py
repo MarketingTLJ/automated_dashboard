@@ -122,8 +122,8 @@ def check_coherence(new):
     errs = []
     for d in new['DATA']:
         ym = d['ym']
-        if d['leads_total'] != d['leads_sdr'] + d['leads_closer'] + d.get('leads_eventos', 0):
-            errs.append(f"{ym}: leads_total ≠ SDR + Closer + Eventos")
+        if d['leads_total'] != d['leads_sdr'] + d['leads_closer']:
+            errs.append(f"{ym}: leads_total ≠ SDR + Closer")
         if d['reunioes'] != d['leads_closer']:
             errs.append(f"{ym}: reuniões ≠ leads Closer")
         if d['leads_efetivos'] != max(d['leads_total'] - d['leads_descartados'], 0):
@@ -132,7 +132,6 @@ def check_coherence(new):
             errs.append(f"{ym}: SDR perdido + ativo > leads SDR")
         pf = d.get('por_fonte', {})
         for tot, k in (('leads_sdr', 'leads_sdr'), ('leads_closer', 'leads_closer'),
-                       ('leads_eventos', 'leads_eventos'), ('eventos_perdido', 'eventos_perdido'),
                        ('sdr_perdido', 'sdr_perdido'), ('leads_descartados', 'descartados'),
                        ('ganho', 'ganho'), ('perdido', 'perdido')):
             if sum(v.get(k, 0) for v in pf.values()) != d[tot]:

@@ -64,16 +64,18 @@ MOTIVOS_NAO_EFETIVOS = {
                                         # 'Sem Contato / Sem Resposta' (rename retroativo)
 }
 
-# Eventos — pipeline "Eventos & Inscritos" do Bitrix (CLAUDE.md §16). Decisão do usuário
-# (2026-10-01): entram SÓ os leads das fontes listadas aqui, numa linha própria
-# (`leads_eventos`) que soma em Leads Totais — NÃO em SDR/Closer. Fase de perda
-# (failure/apology) = perdido; o resto = em andamento; "VENDA REALIZADA" NÃO vira venda
-# (vendas vêm só do Closer). Cada evento também gera o comentário do mês no dashboard.
+# Eventos (CLAUDE.md §16). Os leads do evento são COPIADOS para o pipeline SDR e contam
+# como leads SDR normais. Decisão do usuário (2026-10-06): as cópias contam no mês do
+# evento (`ym`), não no dia em que foram copiadas — o investimento é do mês do evento.
+#   copiado_sdr_em     = dia em que as cópias foram criadas no SDR; SDR com essa `fonte`
+#                        criado nesse dia → vai para `ym`. Outros dias contam normalmente.
 #   canal_investimento = linha de INVESTIMENTOS.xlsx que recebeu a verba do evento
+# O pipeline "Eventos & Inscritos" (127) NÃO é lido — evita contar o lead duas vezes.
 # Novo evento → acrescentar um item aqui (e a fonte em FontesPagas.xlsx se for paga).
 EVENTOS = [
     {'ym': '2026-09', 'nome': 'Lançamento do Cockpit AI (Live 28/09)',
-     'fonte': 'Cockpit Website', 'canal_investimento': 'Outros'},
+     'fonte': 'Cockpit Website', 'canal_investimento': 'Outros',
+     'copiado_sdr_em': '2026-10-05'},
 ]
 EVENTOS_FONTES = {e['fonte'] for e in EVENTOS}
 
@@ -207,22 +209,22 @@ class SchemaError(RuntimeError):
     """O Bitrix mudou de um jeito que distorceria os números — NÃO publicar."""
 
 
-_EVENTOS_COLS = ['ID', 'Nome do negócio', 'Fase', 'FaseSem', 'Criado', 'Fonte', '[SDR] Motivo de perda']
-
-
-def _prepare_eventos(eventos):
-    """Só as fontes de EVENTOS; status = Perdido (failure/apology), Ganho (success) ou Andamento."""
-    ev = eventos[eventos['Fonte'].isin(EVENTOS_FONTES)].copy()
-    ev['dt'] = pd.to_datetime(ev['Criado'], errors='coerce')
-    ev['EvStatus'] = ev['FaseSem'].map(
-        lambda s: 'Perdido' if s in ('failure', 'apology') else 'Ganho' if s == 'success' else 'Andamento')
-    return ev
+def _redate_eventos(sdr):
+    """Cópias de leads de evento no SDR → contam no mês do evento (§16). Mutates sdr['dt']."""
+    for e in EVENTOS:
+        mask = (sdr['Fonte'] == e['fonte']) & \
+               (sdr['dt'].dt.strftime('%Y-%m-%d') == e['copiado_sdr_em'])
+        # último dia do mês do evento — só o mês importa para os indicadores
+        sdr.loc[mask, 'dt'] = pd.Period(e['ym'], freq='M').to_timestamp(how='end').normalize()
+        print(f"  Evento '{e['nome']}': {int(mask.sum())} leads SDR copiados em "
+              f"{e['copiado_sdr_em']} contados em {e['ym']}")
 
 
 def _prepare(sdr, closer, rent, lics):
     """Colunas derivadas comuns às duas fontes (Excel e Bitrix)."""
     sdr['dt']      = pd.to_datetime(sdr['Criado'],              errors='coerce')
     sdr['dt_fech'] = pd.to_datetime(sdr['Data de fechamento'],  errors='coerce')
+    _redate_eventos(sdr)
     sdr['FaseAdj'] = sdr['Fase'].apply(
         lambda x: 'Perdido' if x in FASES_PERDIDO_SDR else x
     )
@@ -251,9 +253,7 @@ def load_dataframes_excel():
              _latest(FILE_RENT, 'BASE RENTABILIZA*.xlsx'), _latest(FILE_LC, 'BASE LICEN*.xlsx')]
     for f in files:
         print(f"  Loading {f.name}...")
-    RUN_INFO['warnings'].append("Backup Excel não tem o pipeline Eventos — leads de eventos ficam de fora")
-    eventos = _prepare_eventos(pd.DataFrame(columns=_EVENTOS_COLS))
-    return (*_prepare(*(pd.read_excel(f) for f in files)), eventos)
+    return _prepare(*(pd.read_excel(f) for f in files))
 
 
 def check_bitrix_schema(meta):
@@ -301,7 +301,7 @@ def check_bitrix_schema(meta):
     for m in sorted(MOTIVOS_NAO_EFETIVOS - motivos):
         problems.append(f"Motivo '{m}' (MOTIVOS_NAO_EFETIVOS) não existe mais no Bitrix — foi renomeado?")
 
-    # Fonte de evento renomeada → os leads do evento sumiriam do total sem erro
+    # Fonte de evento renomeada → os leads do evento voltariam ao mês da cópia sem erro
     for f in sorted(EVENTOS_FONTES - meta['sources']):
         problems.append(f"Fonte de evento '{f}' (EVENTOS) não existe mais no Bitrix — foi renomeada?")
 
@@ -319,8 +319,7 @@ def load_dataframes_bitrix():
     meta = load_raw_frames()
     check_bitrix_schema(meta)
     RUN_INFO['counts'] = meta['counts']
-    return (*_prepare(meta['sdr'], meta['closer'], meta['rent'], meta['lics']),
-            _prepare_eventos(meta['eventos']))
+    return _prepare(meta['sdr'], meta['closer'], meta['rent'], meta['lics'])
 
 
 def _safe_int(x):
@@ -351,7 +350,7 @@ def _descartados(df, col='[SDR] Motivo de perda'):
     return _safe_int(df[col].isin(MOTIVOS_NAO_EFETIVOS).sum())
 
 
-def _build_por_fonte(s, c, c_fechado, r_inc, r_ren, ev=None):
+def _build_por_fonte(s, c, c_fechado, r_inc, r_ren):
     """
     Builds per-fonte breakdown dict combining SDR leads, Closer leads,
     won deals, incrementos, and renovações.
@@ -379,8 +378,6 @@ def _build_por_fonte(s, c, c_fechado, r_inc, r_ren, ev=None):
         'ganho': 0, 'perdido': 0, 'aberto': 0,
         'valor_total_prop': 0.0, 'valor_aberto_prop': 0.0,
         'valor_perdido_prop': 0.0, 'valor_ganho_prop': 0.0,
-        # Leads de eventos (§16) — linha própria, fora de SDR/Closer
-        'leads_eventos': 0, 'eventos_ativo': 0, 'eventos_perdido': 0,
     }
     result = {}
 
@@ -456,17 +453,6 @@ def _build_por_fonte(s, c, c_fechado, r_inc, r_ren, ev=None):
             result[f]['valor_ganho_prop']   += g_valor_ganho
             result[f]['valor_perdido_prop'] += g_valor_perdido
             result[f]['valor_aberto_prop']  += round(max(g_valor_total - g_valor_ganho - g_valor_perdido, 0), 2)
-
-    # Leads de eventos by fonte (criado)
-    if ev is not None and len(ev):
-        for fonte, grp in ev.groupby(ev['Fonte'].fillna('Não identificado')):
-            f = _fname(fonte)
-            _ensure(f)
-            perd = grp[grp['EvStatus'] == 'Perdido']
-            result[f]['leads_eventos']   += len(grp)
-            result[f]['eventos_perdido'] += len(perd)
-            result[f]['eventos_ativo']   += _safe_int((grp['EvStatus'] == 'Andamento').sum())
-            result[f]['descartados']     += _descartados(perd)
 
     # Vendas fechadas by fonte
     if 'Fonte' in c_fechado.columns:
@@ -568,19 +554,15 @@ def _build_lc_fields(lics, y, m):
     }
 
 
-def build_month(ym, label, sdr, closer, rent, lics, inv_map, inv_breakdown, eventos=None):
+def build_month(ym, label, sdr, closer, rent, lics, inv_map, inv_breakdown):
     y, m = int(ym[:4]), int(ym[5:])
 
     # ─── VOLUME: IDs criados no mês (todos os pipelines) ─────────────────────
     s  = sdr[   (sdr['dt'].dt.year==y)    & (sdr['dt'].dt.month==m)]
     c  = closer[(closer['dt'].dt.year==y) & (closer['dt'].dt.month==m)]
     r_vol = rent[(rent['dt'].dt.year==y)  & (rent['dt'].dt.month==m)]
-    # Leads de eventos (§16): linha própria — entram no Total de Leads, não no SDR/Closer
-    ev = eventos[(eventos['dt'].dt.year==y) & (eventos['dt'].dt.month==m)] \
-        if eventos is not None else pd.DataFrame(columns=['EvStatus', 'Fase', 'Fonte'])
-    ev_perd = ev[ev['EvStatus'] == 'Perdido']
 
-    ls, lc, le = len(s), len(c), len(ev)
+    ls, lc = len(s), len(c)
 
     # ─── PIPELINE HEALTH (por criação, para taxa_fech e análise de funil) ─────
     ganho   = _safe_int((c['Fase']=='Venda - Ganho').sum())
@@ -593,9 +575,8 @@ def build_month(ym, label, sdr, closer, rent, lics, inv_map, inv_breakdown, even
     # oportunidade (MOTIVOS_NAO_EFETIVOS), tanto no SDR quanto no Closer.
     # Equivale a "em andamento SDR + leads no Closer + perdidos com motivo real".
     leads_descartados = (_descartados(s[s['FaseAdj']=='Perdido'])
-                         + _descartados(c[c['Fase']=='Perdido'])
-                         + _descartados(ev_perd))
-    leads_efetivos    = max((ls + lc + le) - leads_descartados, 0)
+                         + _descartados(c[c['Fase']=='Perdido']))
+    leads_efetivos    = max((ls + lc) - leads_descartados, 0)
 
     # ─── VALOR GERENCIADO EM PROPOSTAS (por criação, status atual) ────────────
     # Mesma safra do pipeline health acima, mas em R$ em vez de contagem —
@@ -658,7 +639,7 @@ def build_month(ym, label, sdr, closer, rent, lics, inv_map, inv_breakdown, even
     roi         = round((rec_v - inv) / inv, 1) if inv > 0 else 0.0   # Net ROI
     lucro_bruto = round(rec_v - inv, 2)
     cac         = round(inv / qtd_v, 2) if qtd_v > 0 else 0.0
-    cpl         = round(inv / (ls+lc+le), 2) if (ls+lc+le) > 0 else 0.0
+    cpl         = round(inv / (ls+lc), 2) if (ls+lc) > 0 else 0.0
 
     # SDR by responsible
     sdr_resp = {}
@@ -744,15 +725,10 @@ def build_month(ym, label, sdr, closer, rent, lics, inv_map, inv_breakdown, even
         'ym': ym, 'label': label,
         'leads_sdr':    ls,
         'leads_closer': lc,
-        'leads_eventos': le,
-        'leads_total':  ls + lc + le,
+        'leads_total':  ls + lc,
         'leads_efetivos':    leads_efetivos,
         'leads_descartados': leads_descartados,
         'reunioes':     lc,
-        # Eventos por status e por fase (ex: {'Incritos': 83, 'Novo': 4, 'PERDIDO': 1})
-        'eventos_ativo':   _safe_int((ev['EvStatus'] == 'Andamento').sum()),
-        'eventos_perdido': len(ev_perd),
-        'eventos_fases':   _top(ev['Fase'], 10) if le else {},
         'sdr_perdido':  _safe_int((s['FaseAdj']=='Perdido').sum()),
         'sdr_ativo':    _safe_int(len(s[~s['FaseAdj'].isin({'Perdido','Reunião Realizada'})])),
         'ganho':        ganho,
@@ -799,7 +775,7 @@ def build_month(ym, label, sdr, closer, rent, lics, inv_map, inv_breakdown, even
             'por_resp':    pp_resp,
             'motivos_geral': _motivos(fp),
         },
-        'por_fonte': _build_por_fonte(s, c, c_fechado, r_inc, r_ren, ev),
+        'por_fonte': _build_por_fonte(s, c, c_fechado, r_inc, r_ren),
         **_build_lc_fields(lics, y, m),
     }
 
@@ -939,11 +915,9 @@ def main(source='bitrix', output=None):
     print(f"  Found investments for {len(inv_map)} months: {sorted(inv_map.keys())}")
 
     print("Loading CRM data...")
-    sdr, closer, rent, lics, eventos = (load_dataframes_bitrix() if source == 'bitrix'
-                                        else load_dataframes_excel())
+    sdr, closer, rent, lics = load_dataframes_bitrix() if source == 'bitrix' else load_dataframes_excel()
     if not RUN_INFO['counts']:
         RUN_INFO['counts'] = {'sdr': len(sdr), 'closer': len(closer), 'rent': len(rent), 'lics': len(lics)}
-    print(f"  Eventos: {len(eventos)} leads das fontes {sorted(EVENTOS_FONTES)}")
     print(f"  SDR:      {len(sdr)} records")
     print(f"  Closer:   {len(closer)} records")
     print(f"  Rent:     {len(rent)} records ({rent['Fase'].isin(FASES_GANHO_RENT).sum()} ganhos)")
@@ -961,7 +935,7 @@ def main(source='bitrix', output=None):
             continue
         print(f"  Processing {label}...", end='  ')
         try:
-            row = build_month(ym, label, sdr, closer, rent, lics, inv_map, inv_breakdown, eventos)
+            row = build_month(ym, label, sdr, closer, rent, lics, inv_map, inv_breakdown)
             monthly.append(row)
             lc_info = f", lc_ren={row['lc_renovado']}/can={row['lc_cancelado']}" if row['lc_total'] > 0 else ''
             print(f"leads={row['leads_total']}, ganho={row['ganho']}, rec_v=R${row['rec_v']:,.0f}{lc_info}")
@@ -1032,7 +1006,7 @@ def main(source='bitrix', output=None):
         f"export const FONTES_PAGAS = {json.dumps(sorted(fontes_pagas), ensure_ascii=False)};\n\n"
         f"// Motivos de perda descontados de `leads_efetivos` (lead nunca foi oportunidade real)\n"
         f"export const MOTIVOS_NAO_EFETIVOS = {json.dumps(sorted(MOTIVOS_NAO_EFETIVOS), ensure_ascii=False)};\n\n"
-        f"// Eventos com leads próprios e verba em INVESTIMENTOS.xlsx — comentário do mês (§16)\n"
+        f"// Eventos com verba em INVESTIMENTOS.xlsx (leads = SDR da fonte) — comentário do mês (§16)\n"
         f"export const EVENTOS = {json.dumps(EVENTOS, ensure_ascii=False)};\n\n"
         f"// Momento da extração (horário de São Paulo) e origem dos dados do CRM\n"
         f"export const ATUALIZADO_EM = {json.dumps(atualizado_em)};\n"

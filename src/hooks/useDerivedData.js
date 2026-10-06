@@ -182,8 +182,6 @@ function applyFonteFilter(monthData, expandedFontes) {
   const pf = monthData.por_fonte || {};
 
   let leads_sdr = 0, leads_closer = 0;
-  // Leads de eventos (CLAUDE.md §16) — linha própria, somam em leads_total
-  let leads_eventos = 0, eventos_ativo = 0, eventos_perdido = 0;
   let qtd_v = 0, rec_v = 0;
   let qtd_i = 0, rec_i = 0;
   let qtd_r = 0, rec_r = 0;
@@ -202,10 +200,7 @@ function applyFonteFilter(monthData, expandedFontes) {
     if (!d) return;
     leads_sdr    += d.leads_sdr    || 0;
     leads_closer += d.leads_closer || 0;
-    leads_eventos   += d.leads_eventos   || 0;
-    eventos_ativo   += d.eventos_ativo   || 0;
-    eventos_perdido += d.eventos_perdido || 0;
-    qtd_v       += d.qtd_v        || 0;
+    qtd_v        += d.qtd_v        || 0;
     rec_v        += d.rec_v        || 0;
     qtd_i        += d.qtd_i        || 0;
     rec_i        += d.rec_i        || 0;
@@ -241,7 +236,7 @@ function applyFonteFilter(monthData, expandedFontes) {
     });
   });
 
-  const leads_total    = leads_sdr + leads_closer + leads_eventos;
+  const leads_total    = leads_sdr + leads_closer;
   const leads_efetivos = Math.max(leads_total - leads_descartados, 0);
   const inv         = monthData.inv; // investment is not per-fonte
   const ticket      = qtd_v > 0  ? +(rec_v / qtd_v).toFixed(0)            : 0;
@@ -260,9 +255,6 @@ function applyFonteFilter(monthData, expandedFontes) {
   return {
     ...monthData,
     leads_sdr, leads_closer, leads_total,
-    leads_eventos, eventos_ativo, eventos_perdido,
-    // fases do evento não são quebradas por fonte — some quando o filtro exclui os eventos
-    eventos_fases: leads_eventos ? monthData.eventos_fases : {},
     // reuniões = leads criados no Closer (regra de negócio) — segue o filtro
     reunioes: leads_closer,
     leads_efetivos, leads_descartados,
@@ -291,9 +283,6 @@ function buildPeriodCurr(filtered, filteredT, label) {
   const leads_closer = sumKey(filtered, 'leads_closer');
   const leads_total  = sumKey(filtered, 'leads_total');
   const reunioes     = sumKey(filtered, 'reunioes');
-  const leads_eventos   = sumKey(filtered, 'leads_eventos');
-  const eventos_ativo   = sumKey(filtered, 'eventos_ativo');
-  const eventos_perdido = sumKey(filtered, 'eventos_perdido');
   // Leads efetivos são aditivos entre meses (contagem simples), então somam direto
   const leads_efetivos    = sumKey(filtered, 'leads_efetivos');
   const leads_descartados = sumKey(filtered, 'leads_descartados');
@@ -365,8 +354,6 @@ function buildPeriodCurr(filtered, filteredT, label) {
     ym: filtered[filtered.length - 1]?.ym ?? '',
     label,
     leads_sdr, leads_closer, leads_total, reunioes, sdr_perdido, sdr_ativo,
-    leads_eventos, eventos_ativo, eventos_perdido,
-    eventos_fases: mergeKV(filtered, 'eventos_fases'),
     leads_efetivos, leads_descartados,
     ganho: ganho_c, perdido: perdido_c, aberto: aberto_c, taxa_fech: taxa_fech_c,
     valor_total_prop, valor_aberto_prop, valor_perdido_prop, valor_ganho_prop,

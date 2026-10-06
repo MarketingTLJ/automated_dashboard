@@ -92,12 +92,6 @@ export function Tab2_FunilComercial({ CURR, PREV, trend6, N6, filtered, isRange 
               <span className="text-brand-blue-light font-bold">{CURR.leads_sdr}</span> SDR
               {' + '}
               <span className="font-bold" style={{ color: '#2563eb' }}>{CURR.leads_closer}</span> Closer
-              {CURR.leads_eventos > 0 && (
-                <>
-                  {' + '}
-                  <span className="font-bold" style={{ color: COLORS.eventos }}>{CURR.leads_eventos}</span> Eventos
-                </>
-              )}
             </p>
           </div>
           <div>
