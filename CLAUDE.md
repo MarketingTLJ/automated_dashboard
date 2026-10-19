@@ -246,10 +246,11 @@ Data de Término: [start ←→ end] ← controla DATA_TERMINO (vendas por data 
 
 ### Estados em App.jsx
 ```js
-const [criadoStart, setCriadoStart]   = useState(SIX_AGO);  // default: -6 meses
-const [criadoEnd,   setCriadoEnd]     = useState(LAST);
-const [terminoStart, setTerminoStart] = useState(LAST);      // default: mês atual
-const [terminoEnd,   setTerminoEnd]   = useState(LAST);
+// INICIAL = PARTIAL_YM (mês atual, "parcial") — ambos os filtros abrem nele (2026-10-19)
+const [criadoStart, setCriadoStart]   = useState(INICIAL);
+const [criadoEnd,   setCriadoEnd]     = useState(INICIAL);
+const [terminoStart, setTerminoStart] = useState(INICIAL);
+const [terminoEnd,   setTerminoEnd]   = useState(INICIAL);
 ```
 
 ### Hook useDerivedData(criadoStart, criadoEnd, terminoStart, terminoEnd, fonteFilter)
@@ -650,7 +651,7 @@ Rodando o `extract.py` atual com os dados da API no lugar das planilhas de 30.09
    link do Bitrix não sai do computador e a planilha de investimentos fica em `Reports/`).
 3. **Investimentos:** continuam em `Reports/INVESTIMENTOS.xlsx`, mesmo formato.
 4. **Planilhas exportadas:** mantidas só como backup (`--source excel`).
-5. **Mês em andamento:** o dashboard abre no **último mês fechado**; o mês corrente aparece
+5. **Mês em andamento:** o dashboard abre no **mês atual (parcial)** nos dois filtros (mudou em 2026-10-19; antes abria no último mês fechado); o mês corrente aparece
    como "(parcial)"; sem investimento lançado → "Aguardando investimento" (§15.7).
 6. Pendente com o desenvolvedor (opcional): escopo `user_brief` e webhook de usuário só-leitura.
 
@@ -661,7 +662,8 @@ Rodando o `extract.py` atual com os dados da API no lugar das planilhas de 30.09
 - `inv_pendente: true` → mês sem coluna (ou com 0) em INVESTIMENTOS.xlsx.
 
 Front (`src/utils/months.js`):
-- `App.jsx` abre em `LAST_CLOSED` (6 meses até ele no filtro "Criado em").
+- `App.jsx` abre com **"Criado em" e "Data de Término" no mês atual** (`PARTIAL_YM`, "parcial") —
+  decisão do usuário em 2026-10-19 (antes: 6 meses até `LAST_CLOSED` / último mês fechado).
 - Séries fixas de 6 meses (`LAST6_RAW` → `trend6`/`last6`/`investRevenue*`: gráficos de 6 meses do
   Resumo, Receita, Funil, Closers, Prop. Perdidas, Investimentos + Tabela de Investimentos)
   **incluem o mês em andamento** (pedido do usuário em 2026-10-19; antes eram só meses fechados),

@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { ATUALIZADO_EM } from './data/data.js';
-import { ALL_YMS, LAST_CLOSED } from './utils/months.js';
+import { ALL_YMS, PARTIAL_YM } from './utils/months.js';
 import { useDerivedData } from './hooks/useDerivedData.js';
 import { Header } from './components/layout/Header.jsx';
 import { Footer } from './components/layout/Footer.jsx';
@@ -13,20 +13,20 @@ import { Tab5_PropostasPerdidas }  from './tabs/Tab5_PropostasPerdidas.jsx';
 import { Tab6_Investimentos }      from './tabs/Tab6_Investimentos.jsx';
 import { Tab7_Licencas }           from './tabs/Tab7_Licencas.jsx';
 
-// Abre no último mês FECHADO — o mês em andamento fica disponível como "parcial"
-const LAST    = LAST_CLOSED;
-const SIX_AGO = ALL_YMS[Math.max(0, ALL_YMS.indexOf(LAST) - 5)];
+// Abre com "Criado em" e "Data de Término" no MÊS ATUAL (em andamento, "parcial") —
+// decisão do usuário em 2026-10-19. Sem mês em andamento, cai no último mês disponível.
+const INICIAL = PARTIAL_YM ?? ALL_YMS.at(-1);
 
 export default function App() {
   const [activeTab, setActiveTab] = useState(0);
 
-  // Criado em filter — default: last 6 months
-  const [criadoStart, setCriadoStart] = useState(SIX_AGO);
-  const [criadoEnd,   setCriadoEnd]   = useState(LAST);
+  // Criado em filter — default: mês atual
+  const [criadoStart, setCriadoStart] = useState(INICIAL);
+  const [criadoEnd,   setCriadoEnd]   = useState(INICIAL);
 
-  // Data de Término filter — default: this month only
-  const [terminoStart, setTerminoStart] = useState(LAST);
-  const [terminoEnd,   setTerminoEnd]   = useState(LAST);
+  // Data de Término filter — default: mês atual
+  const [terminoStart, setTerminoStart] = useState(INICIAL);
+  const [terminoEnd,   setTerminoEnd]   = useState(INICIAL);
 
   // Fonte filter — default: all sources (empty = no filter)
   const [fonteFilter, setFonteFilter] = useState([]);
