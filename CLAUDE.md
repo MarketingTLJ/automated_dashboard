@@ -696,6 +696,15 @@ Front (`src/utils/months.js`):
   `credential.https://github.com.username = MarketingTLJ` no repo e roda o git com
   `GCM_INTERACTIVE=never` (falha na hora em vez de travar). `logs/estado.json` guarda
   `deployed_commit`: se um deploy ficou pendente, a execução seguinte dispara.
+- **Incidente 15–18/10/2026:** o GCM perdeu a credencial da conta `MarketingTLJ` (só restaram
+  as entradas `gh:github.com` do GitHub CLI) → push falhou 4 dias com "Cannot prompt because
+  user interactivity has been disabled"; commits ficaram só locais e o site parou em 14/10.
+  Correção: o repo usa o **GitHub CLI** como credencial (config local, não versionada):
+  `credential.https://github.com.helper` = `""` + `!'C:/Program Files/GitHub CLI/gh.exe' auth git-credential`.
+  Se voltar a falhar: `gh auth status` (tem de mostrar `MarketingTLJ` com escopo `repo`);
+  se expirou, o usuário roda `gh auth login` uma vez.
+- Todo dia que o log mostra `FALHA`, o Windows mostra a notificação — se o site parar de
+  atualizar, ler `logs/auto_update.log` primeiro.
 - **Horário real:** o notebook usa *Modern Standby* (S0) e, com a tampa fechada, normalmente
   **não acorda às 06:00** (em 01/10 dormiu 22:35 → abriu 08:09). Aí a tarefa roda sozinha
   logo que o PC é aberto (`StartWhenAvailable`) — ~3 min depois o site está atualizado.
@@ -748,7 +757,32 @@ O pipeline Eventos tem 88 negócios dessa fonte — 1 não foi copiado para o SD
 
 ---
 
-*Última atualização: Out/2026 | v5.2 — Eventos: pipeline 127 deixa de ser lido; cópias no SDR contam no mês do evento (§16)*
+## 17. FONTES EXCLUÍDAS (importações em massa)
+
+> Decisão do usuário em 2026-10-19 — **não alterar sem confirmação**.
+
+- `FONTES_EXCLUIDAS = {'Importação'}` (`extract.py`): negócios do pipeline **SDR** com essa
+  fonte são removidos em `_excluir_fontes` (dentro de `_prepare`, vale para `--source bitrix`
+  e `excel`) e **não contam em nada** — Total de Leads, Efetivos, CPL, Em Andamento/Perdidos,
+  tabela por SDR, filtro de fonte.
+- Motivo: em 16/10/2026 o time importou **400 negócios** ("Lead - … - Importação Lista
+  Bitrix24", fonte `Importação`) no SDR. Não são leads gerados no mês: Out/26 iria de
+  123 → 523 leads e o CPL de R$ 59,74 → R$ 14,05.
+- **Closer:** não é filtrado. Se surgir negócio no Closer com fonte excluída, o log registra
+  AVISO e ele segue contando — perguntar ao usuário antes de excluir (afeta vendas/receita).
+- **Trava:** fonte de `FONTES_EXCLUIDAS` inexistente no Bitrix → `SchemaError` (se renomearem
+  'Importação', a importação voltaria a inflar os números sem erro).
+- `logs/estado.json`/contagens de registros usam o total bruto do Bitrix (com importados) —
+  a exclusão não dispara a trava de queda >10%.
+- O log de cada extração mostra `Fontes excluídas ['Importação']: N negócios SDR fora do dashboard`.
+- Importação futura com **outra** fonte → não é excluída automaticamente: perguntar ao usuário
+  e acrescentar a fonte ao set.
+
+---
+
+*Última atualização: Out/2026 | v5.3 — Fonte 'Importação' fora do dashboard (§17); push via GitHub CLI (§15.8)*
+
+*Anterior: v5.2 — Eventos: pipeline 127 deixa de ser lido; cópias no SDR contam no mês do evento (§16)*
 
 *Anterior: v5.1 — Leads de Eventos (§16): Lançamento do Cockpit AI*
 

@@ -79,6 +79,12 @@ EVENTOS = [
 ]
 EVENTOS_FONTES = {e['fonte'] for e in EVENTOS}
 
+# Fontes que ficam FORA do dashboard (CLAUDE.md §17). Decisão do usuário (2026-10-19):
+# 'Importação' = listas importadas em massa no pipeline SDR (400 em 16/10/2026,
+# "Importação Lista Bitrix24") — não são leads gerados no mês e distorceriam Total de
+# Leads, Efetivos, CPL e a tabela dos SDRs. Excluídas só do SDR; no Closer, apenas aviso.
+FONTES_EXCLUIDAS = {'Importação'}
+
 # Licenças CS — fases de sucesso e churn
 FASES_LC_RENOVADO  = {'11 - Renovado'}
 FASES_LC_CANCELADO = {'10 - Cancelado', '12 - Renovado com concorrente',
@@ -220,8 +226,21 @@ def _redate_eventos(sdr):
               f"{e['copiado_sdr_em']} contados em {e['ym']}")
 
 
+def _excluir_fontes(sdr, closer):
+    """Remove do SDR os negócios de FONTES_EXCLUIDAS (§17). No Closer só avisa."""
+    mask = sdr['Fonte'].isin(FONTES_EXCLUIDAS)
+    print(f"  Fontes excluídas {sorted(FONTES_EXCLUIDAS)}: {int(mask.sum())} negócios SDR fora do dashboard")
+    n_closer = int(closer['Fonte'].isin(FONTES_EXCLUIDAS).sum())
+    if n_closer:
+        RUN_INFO['warnings'].append(
+            f"{n_closer} negócio(s) do Closer com fonte em FONTES_EXCLUIDAS — seguem contando; "
+            f"confirmar com o usuário se devem sair também (§17)")
+    return sdr[~mask].copy()
+
+
 def _prepare(sdr, closer, rent, lics):
     """Colunas derivadas comuns às duas fontes (Excel e Bitrix)."""
+    sdr = _excluir_fontes(sdr, closer)
     sdr['dt']      = pd.to_datetime(sdr['Criado'],              errors='coerce')
     sdr['dt_fech'] = pd.to_datetime(sdr['Data de fechamento'],  errors='coerce')
     _redate_eventos(sdr)
@@ -304,6 +323,10 @@ def check_bitrix_schema(meta):
     # Fonte de evento renomeada → os leads do evento voltariam ao mês da cópia sem erro
     for f in sorted(EVENTOS_FONTES - meta['sources']):
         problems.append(f"Fonte de evento '{f}' (EVENTOS) não existe mais no Bitrix — foi renomeada?")
+
+    # Fonte excluída renomeada → a importação voltaria a inflar leads/CPL sem erro
+    for f in sorted(FONTES_EXCLUIDAS - meta['sources']):
+        problems.append(f"Fonte excluída '{f}' (FONTES_EXCLUIDAS) não existe mais no Bitrix — foi renomeada?")
 
     if problems:
         raise SchemaError("Mudança no Bitrix exige revisão antes de publicar:\n  - " + "\n  - ".join(problems))
