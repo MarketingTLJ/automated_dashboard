@@ -1,7 +1,7 @@
 import { useMemo } from 'react';
 import { DATA, DATA_TERMINO } from '../data/data.js';
 import { FONTES_PAGAS } from '../constants/index.js';
-import { anyInvPendente } from '../utils/months.js';
+import { anyInvPendente, monthLabel } from '../utils/months.js';
 
 // ── Aggregation helpers ─────────────────────────────────────────────────────
 
@@ -94,7 +94,7 @@ const semInv = (d, v) => (d.inv_pendente ? null : v);
 // Maps an array of month records into the flat shape used by trend charts
 function buildTrend(arr) {
   return arr.map(d => ({
-    mes:        d.label,
+    mes:        monthLabel(d),
     vendas:     d.rec_v,
     inc:        d.rec_i,
     ren:        d.rec_r,
@@ -127,8 +127,9 @@ function buildTrend(arr) {
 
 // Fixed last-6-months slice of DATA — independent of the date filters,
 // used by charts that must always show a trailing 6-month trend (§ CLAUDE.md request).
-// Só meses FECHADOS: o mês em andamento (parcial) fica de fora das séries fixas.
-const LAST6_RAW = DATA.filter(d => !d.parcial).slice(-6);
+// INCLUI o mês em andamento (pedido do usuário, 2026-10-19), rotulado "(parcial)" por
+// monthLabel — ex.: Mai/26 … Out/26 (parcial). Antes eram só meses fechados.
+const LAST6_RAW = DATA.slice(-6);
 
 // Same calendar months as LAST6_RAW, one year earlier (e.g. Jan-Jun/26 → Jan-Jun/25).
 // Missing months (no data that far back) are simply omitted.
@@ -152,7 +153,7 @@ function buildInvestRevenue(arr, withIncrementos) {
     const cac = semInv(d, qtd > 0 ? +(inv / qtd).toFixed(2) : 0);
     const taxa = d.leads_total > 0 ? +((qtd / d.leads_total) * 100).toFixed(1) : 0;
     // reunioes = leads_closer (regra de negócio) — usa o campo já filtrado por fonte
-    return { mes: d.label, inv, faturamento, lucro, roi, cac, taxa, leads: d.leads_total, reunioes: d.leads_closer, qtd };
+    return { mes: monthLabel(d), inv, faturamento, lucro, roi, cac, taxa, leads: d.leads_total, reunioes: d.leads_closer, qtd };
   });
 }
 

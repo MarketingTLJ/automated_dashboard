@@ -82,7 +82,8 @@ EVENTOS_FONTES = {e['fonte'] for e in EVENTOS}
 # Fontes que ficam FORA do dashboard (CLAUDE.md §17). Decisão do usuário (2026-10-19):
 # 'Importação' = listas importadas em massa no pipeline SDR (400 em 16/10/2026,
 # "Importação Lista Bitrix24") — não são leads gerados no mês e distorceriam Total de
-# Leads, Efetivos, CPL e a tabela dos SDRs. Excluídas só do SDR; no Closer, apenas aviso.
+# Leads, Efetivos, CPL e a tabela dos SDRs. Excluídas SÓ do SDR: importado que avança
+# para o Closer conta normalmente como reunião/venda (decisão do usuário, 2026-10-19).
 FONTES_EXCLUIDAS = {'Importação'}
 
 # Licenças CS — fases de sucesso e churn
@@ -227,14 +228,11 @@ def _redate_eventos(sdr):
 
 
 def _excluir_fontes(sdr, closer):
-    """Remove do SDR os negócios de FONTES_EXCLUIDAS (§17). No Closer só avisa."""
+    """Remove do SDR os negócios de FONTES_EXCLUIDAS (§17). No Closer eles contam normalmente."""
     mask = sdr['Fonte'].isin(FONTES_EXCLUIDAS)
-    print(f"  Fontes excluídas {sorted(FONTES_EXCLUIDAS)}: {int(mask.sum())} negócios SDR fora do dashboard")
     n_closer = int(closer['Fonte'].isin(FONTES_EXCLUIDAS).sum())
-    if n_closer:
-        RUN_INFO['warnings'].append(
-            f"{n_closer} negócio(s) do Closer com fonte em FONTES_EXCLUIDAS — seguem contando; "
-            f"confirmar com o usuário se devem sair também (§17)")
+    print(f"  Fontes excluídas {sorted(FONTES_EXCLUIDAS)}: {int(mask.sum())} negócios SDR fora do "
+          f"dashboard · {n_closer} já avançaram para o Closer (contam normalmente)")
     return sdr[~mask].copy()
 
 

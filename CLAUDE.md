@@ -662,7 +662,11 @@ Rodando o `extract.py` atual com os dados da API no lugar das planilhas de 30.09
 
 Front (`src/utils/months.js`):
 - `App.jsx` abre em `LAST_CLOSED` (6 meses até ele no filtro "Criado em").
-- Séries fixas de 6 meses (`LAST6_RAW`, Tabela de Investimentos) usam só meses fechados.
+- Séries fixas de 6 meses (`LAST6_RAW` → `trend6`/`last6`/`investRevenue*`: gráficos de 6 meses do
+  Resumo, Receita, Funil, Closers, Prop. Perdidas, Investimentos + Tabela de Investimentos)
+  **incluem o mês em andamento** (pedido do usuário em 2026-10-19; antes eram só meses fechados),
+  rotulado `"Out/26 (parcial)"` via `monthLabel()` (`utils/months.js`). Ex.: Mai/26 … Out/26 (parcial).
+  A comparação "6 meses atuais (ano anterior)" acompanha (Mai/25 … Out/25).
 - `CURR.inv_pendente` = algum mês do período sem investimento → Tab6 mostra "—" /
   "Aguardando investimento" em Total Investido, ROI, Lucro Bruto, CAC, CPL e Leads/R$1k;
   `alertEngine` não dispara alertas de ROI/CPL; gráficos recebem `null` (pulam o ponto).
@@ -768,8 +772,10 @@ O pipeline Eventos tem 88 negócios dessa fonte — 1 não foi copiado para o SD
 - Motivo: em 16/10/2026 o time importou **400 negócios** ("Lead - … - Importação Lista
   Bitrix24", fonte `Importação`) no SDR. Não são leads gerados no mês: Out/26 iria de
   123 → 523 leads e o CPL de R$ 59,74 → R$ 14,05.
-- **Closer:** não é filtrado. Se surgir negócio no Closer com fonte excluída, o log registra
-  AVISO e ele segue contando — perguntar ao usuário antes de excluir (afeta vendas/receita).
+- **Closer:** não é filtrado — decisão do usuário (2026-10-19): importado que **avança para o
+  Closer** (oportunidade) conta normalmente como reunião, lead do Closer e venda. O log mostra
+  quantos já avançaram (`… N já avançaram para o Closer`). Em Out/26 o 1º caso fica como
+  1 lead do Closer com fonte `Importação` (aparece no filtro de fonte).
 - **Trava:** fonte de `FONTES_EXCLUIDAS` inexistente no Bitrix → `SchemaError` (se renomearem
   'Importação', a importação voltaria a inflar os números sem erro).
 - `logs/estado.json`/contagens de registros usam o total bruto do Bitrix (com importados) —

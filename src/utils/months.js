@@ -9,5 +9,8 @@ export const PARTIAL_YM  = DATA.find(d => d.parcial)?.ym ?? null;
 
 export const isPartial = ym => ym === PARTIAL_YM;
 
+/** Rótulo do mês para gráficos/tabelas — "Out/26 (parcial)" no mês em andamento */
+export const monthLabel = d => (d.parcial ? `${d.label} (parcial)` : d.label);
+
 /** true se algum mês do conjunto ainda não tem investimento lançado na planilha */
 export const anyInvPendente = (...arrs) => arrs.some(arr => (arr || []).some(d => d?.inv_pendente));

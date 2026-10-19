@@ -1,5 +1,6 @@
 import { useState, Fragment } from 'react';
 import { fmt, pct, sclCls } from '../../utils/formatters.js';
+import { monthLabel } from '../../utils/months.js';
 
 const BITRIX_DEAL_URL = id => `https://tljmkt.bitrix24.com.br/crm/deal/details/${id}/`;
 
@@ -47,7 +48,7 @@ export function InvestmentTable({ last6 }) {
                   }`}
                 >
                   <td className={`p-4 font-bold ${isCurrent ? 'text-brand-blue-light' : 'text-gray-600'}`}>
-                    {d.label}{isCurrent ? ' ★' : ''} {isSel ? '▲' : '▼'}
+                    {monthLabel(d)}{isCurrent ? ' ★' : ''} {isSel ? '▲' : '▼'}
                   </td>
                   <td className="p-4 text-right text-brand-blue-light font-mono">
                     {pend ? <span className="text-gray-400 font-sans">Aguardando</span> : fmt(d.inv)}
@@ -73,7 +74,7 @@ export function InvestmentTable({ last6 }) {
                     <td colSpan={11} className="p-0">
                       <div className="px-5 pb-4 pt-2">
                         <p className="text-cyan-600 text-xs font-semibold uppercase tracking-wider mb-2">
-                          Vendas — {d.label} ({vendas.length})
+                          Vendas — {monthLabel(d)} ({vendas.length})
                         </p>
                         {vendas.length > 0 ? (
                           <div className="overflow-auto">
