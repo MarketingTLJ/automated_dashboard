@@ -86,6 +86,12 @@ EVENTOS_FONTES = {e['fonte'] for e in EVENTOS}
 # para o Closer conta normalmente como reunião/venda (decisão do usuário, 2026-10-19).
 FONTES_EXCLUIDAS = {'Importação'}
 
+# Funil de conversão (CLAUDE.md §18) só a partir deste mês. Até Jul/25 o time COPIAVA o card
+# do SDR para o Closer (o original ficava no SDR em 'Reunião Realizada'); Ago–Dez/25 misturou
+# cópia e movimentação; desde Jan/26 o card é MOVIDO. Com cópia o mesmo lead conta duas vezes
+# e as etapas não fecham — então meses anteriores saem com funil = None (front explica).
+FUNIL_DESDE = '2026-01'
+
 # Licenças CS — fases de sucesso e churn
 FASES_LC_RENOVADO  = {'11 - Renovado'}
 FASES_LC_CANCELADO = {'10 - Cancelado', '12 - Renovado com concorrente',
@@ -313,6 +319,18 @@ def check_bitrix_schema(meta):
         if nome not in FASES_LC_CANCELADO:
             problems.append(f"Licenças: fase de cancelamento '{nome}' não está em FASES_LC_CANCELADO")
 
+    # Funil: etapas de reunião do SDR lidas do histórico (bitrix_source.SDR_STAGES_AGENDADA).
+    # Etapa sumida ou etapa nova de reunião fora do mapa → o funil contaria errado sem erro.
+    from bitrix_source import SDR_STAGES_AGENDADA
+    sdr_ids = {s['STATUS_ID']: s['NAME'] for s in meta['stages'][CAT_SDR]}
+    for sid, nome in SDR_STAGES_AGENDADA.items():
+        if sid not in sdr_ids:
+            problems.append(f"SDR: etapa de reunião '{nome}' ({sid}) não existe mais — revisar SDR_STAGES_AGENDADA")
+    for s in meta['stages'][CAT_SDR]:   # etapas de perda ('Perdido - sem reunião') não são reunião
+        sid, nome = s['STATUS_ID'], s['NAME']
+        if s['SEMANTICS'] in ('process', 'success') and sid not in SDR_STAGES_AGENDADA                 and any(w in nome.lower() for w in ('reuni', 'agend', 'show')):
+            problems.append(f"SDR: etapa nova de reunião '{nome}' ({sid}) fora de SDR_STAGES_AGENDADA (funil)")
+
     # Motivos descontados de Leads Efetivos têm de existir com a grafia exata
     motivos = set(meta['enums'][UF_MOTIVO_SDR].values())
     for m in sorted(MOTIVOS_NAO_EFETIVOS - motivos):
@@ -340,7 +358,75 @@ def load_dataframes_bitrix():
     meta = load_raw_frames()
     check_bitrix_schema(meta)
     RUN_INFO['counts'] = meta['counts']
-    return _prepare(meta['sdr'], meta['closer'], meta['rent'], meta['lics'])
+    sdr, closer, rent, lics = _prepare(meta['sdr'], meta['closer'], meta['rent'], meta['lics'])
+    _marcar_reunioes(sdr, closer, meta['reunioes'])
+    return sdr, closer, rent, lics
+
+
+def _marcar_reunioes(sdr, closer, reunioes):
+    """
+    Colunas do funil, a partir do histórico de etapas do SDR (só existe via Bitrix):
+      sdr.agendada / sdr.realizada → negócio do SDR chegou a agendar / realizar reunião
+      closer.via_sdr               → negócio do Closer que veio do SDR (passou por reunião)
+    Sem essas colunas (--source excel) o funil sai como None e o front mostra "indisponível".
+    """
+    sdr['agendada']    = sdr['ID'].astype(int).isin(reunioes['agendada'])
+    sdr['realizada']   = sdr['ID'].astype(int).isin(reunioes['realizada'])
+    closer['via_sdr']  = closer['ID'].astype(int).isin(reunioes['agendada'])
+    print(f"  Funil: {int(sdr['agendada'].sum())} negócios no SDR já agendaram reunião · "
+          f"{int(closer['via_sdr'].sum())} do Closer vieram do SDR")
+
+
+def _funil(s, c):
+    """
+    Funil por Criado (abas Funil Comercial e Análise SDR — decisão do usuário 2026-10-19).
+    Ao realizar a reunião o Bitrix MOVE o negócio do SDR para o Closer, então:
+      agendadas      = SDR que agendou (inclui no-show) + todo o Closer (via SDR ou direto)
+      oportunidades  = leads_closer · vendas = ganho (safra) — já existem no mês
+      sdr_entrada    = leads que entraram pelo SDR = ainda no SDR + movidos para o Closer
+      sdr_efetivos   = sdr_entrada − descartados (MOTIVOS_NAO_EFETIVOS)
+      sdr_agendadas / sdr_realizadas / sdr_vendas / sdr_aberto = só os que vieram do SDR
+    """
+    if 'agendada' not in s.columns or 'via_sdr' not in c.columns:
+        return None
+    cv = c[c['via_sdr']]
+    s_ag = _safe_int(s['agendada'].sum())
+    sdr_entrada = len(s) + len(cv)
+    desc = _descartados(s[s['FaseAdj'] == 'Perdido']) + _descartados(cv[cv['Fase'] == 'Perdido'])
+    v_ganho   = _safe_int((cv['Fase'] == 'Venda - Ganho').sum())
+    v_perdido = _safe_int((cv['Fase'] == 'Perdido').sum())
+    return {
+        'agendadas':      s_ag + len(c),
+        'sdr_entrada':    sdr_entrada,
+        'sdr_efetivos':   max(sdr_entrada - desc, 0),
+        'sdr_agendadas':  s_ag + len(cv),
+        'sdr_realizadas': _safe_int(s['realizada'].sum()) + len(cv),
+        'sdr_vendas':     v_ganho,
+        'sdr_aberto':     max(len(cv) - v_ganho - v_perdido, 0),
+    }
+
+
+def _closer_diretos(c):
+    """
+    Negócios criados DIRETO no Closer (nunca passaram pelo SDR — ex: indicação, carteira).
+    Explicam a diferença entre o Funil Comercial e o Funil SDR; listados na aba Funil
+    Comercial. None sem histórico de etapas (--source excel).
+    """
+    if 'via_sdr' not in c.columns:
+        return None
+    d = c[~c['via_sdr']].sort_values('dt')
+    return [
+        {
+            'id':          str(row['ID']),
+            'nome':        str(row['Nome do negócio']) if pd.notna(row['Nome do negócio']) else '',
+            'fonte':       str(row['Fonte']).strip() if pd.notna(row['Fonte']) and str(row['Fonte']).strip() else 'Não identificado',
+            'responsavel': str(row['Responsável']) if pd.notna(row['Responsável']) else '',
+            'fase':        str(row['Fase']) if pd.notna(row['Fase']) else '',
+            'valor':       float(round(row['Renda'], 2)) if pd.notna(row['Renda']) else 0.0,
+            'criado':      row['dt'].strftime('%d/%m/%Y') if pd.notna(row['dt']) else '',
+        }
+        for _, row in d.iterrows()
+    ]
 
 
 def _safe_int(x):
@@ -371,7 +457,7 @@ def _descartados(df, col='[SDR] Motivo de perda'):
     return _safe_int(df[col].isin(MOTIVOS_NAO_EFETIVOS).sum())
 
 
-def _build_por_fonte(s, c, c_fechado, r_inc, r_ren):
+def _build_por_fonte(s, c, c_fechado, r_inc, r_ren, funil=True):
     """
     Builds per-fonte breakdown dict combining SDR leads, Closer leads,
     won deals, incrementos, and renovações.
@@ -498,6 +584,13 @@ def _build_por_fonte(s, c, c_fechado, r_inc, r_ren):
             _ensure(f)
             result[f]['qtd_r'] += len(grp)
             result[f]['rec_r'] += float(round(grp['Renda'].sum(), 2))
+
+    # Funil por fonte (só nos meses por Criado) — para os funis responderem ao filtro de Fonte
+    if funil:
+        s_por_fonte = {_fname(k): g for k, g in s.groupby(s['Fonte'].fillna('Não identificado'))} \
+            if 'Fonte' in s.columns else {}
+        for f in result:
+            result[f]['funil'] = _funil(s_por_fonte.get(f, s.iloc[0:0]), c_por_fonte.get(f, c.iloc[0:0]))
 
     return result
 
@@ -796,7 +889,9 @@ def build_month(ym, label, sdr, closer, rent, lics, inv_map, inv_breakdown):
             'por_resp':    pp_resp,
             'motivos_geral': _motivos(fp),
         },
-        'por_fonte': _build_por_fonte(s, c, c_fechado, r_inc, r_ren),
+        'funil':          _funil(s, c) if ym >= FUNIL_DESDE else None,
+        'closer_diretos': _closer_diretos(c) if ym >= FUNIL_DESDE else None,
+        'por_fonte': _build_por_fonte(s, c, c_fechado, r_inc, r_ren, funil=ym >= FUNIL_DESDE),
         **_build_lc_fields(lics, y, m),
     }
 
@@ -914,7 +1009,7 @@ def build_month_termino(ym, label, sdr, closer, rent, lics, inv_map, inv_breakdo
             'por_resp': pp_resp,
             'motivos_geral': _motivos(c_perdido),
         },
-        'por_fonte': _build_por_fonte(sdr.iloc[0:0], c_all, c_ganho, r_inc, r_ren),
+        'por_fonte': _build_por_fonte(sdr.iloc[0:0], c_all, c_ganho, r_inc, r_ren, funil=False),
         **_build_lc_fields(lics, y, m),
     }
 
@@ -1029,6 +1124,8 @@ def main(source='bitrix', output=None):
         f"export const MOTIVOS_NAO_EFETIVOS = {json.dumps(sorted(MOTIVOS_NAO_EFETIVOS), ensure_ascii=False)};\n\n"
         f"// Eventos com verba em INVESTIMENTOS.xlsx (leads = SDR da fonte) — comentário do mês (§16)\n"
         f"export const EVENTOS = {json.dumps(EVENTOS, ensure_ascii=False)};\n\n"
+        f"// Primeiro mês com funil de conversão (antes o card era copiado do SDR para o Closer) — §18\n"
+        f"export const FUNIL_DESDE = {json.dumps(FUNIL_DESDE)};\n\n"
         f"// Momento da extração (horário de São Paulo) e origem dos dados do CRM\n"
         f"export const ATUALIZADO_EM = {json.dumps(atualizado_em)};\n"
         f"export const FONTE_DADOS = {json.dumps(source)};\n"

@@ -7,7 +7,7 @@ export function Header({
   criadoStart, criadoEnd, onCriadoStartChange, onCriadoEndChange,
   terminoStart, terminoEnd, onTerminoStartChange, onTerminoEndChange,
   currLabel,
-  allFontes, fonteFilter, onFonteFilterChange,
+  allFontes, fontesInfo, fonteFilter, onFonteFilterChange,
 }) {
   return (
     <div
@@ -79,6 +79,7 @@ export function Header({
         {/* Fonte filter */}
         <FonteSelector
           allFontes={allFontes}
+          fontesInfo={fontesInfo}
           fonteFilter={fonteFilter}
           onChange={onFonteFilterChange}
         />

@@ -32,14 +32,14 @@ export default function App() {
   const [fonteFilter, setFonteFilter] = useState([]);
 
   const {
-    filtered, filteredTermino, CURR, PREV, N, trend, trend6, N6, last6,
+    filtered, filteredTermino, CURR, PREV, N, trend, trend6, N6, last6, funil6, funilPeriodo,
     investRevenueVendas, investRevenueVendasInc,
     investRevenueVendasPrevYear, investRevenueVendasIncPrevYear,
-    taxaGeralCurr, taxaGeralPrev, allMonths, isRange, allFontes,
+    taxaGeralCurr, taxaGeralPrev, allMonths, isRange, allFontes, fontesInfo,
   } = useDerivedData(criadoStart, criadoEnd, terminoStart, terminoEnd, fonteFilter);
 
   const tabProps = {
-    CURR, PREV, trend, N, trend6, N6, last6,
+    CURR, PREV, trend, N, trend6, N6, last6, funil6, funilPeriodo,
     investRevenueVendas, investRevenueVendasInc,
     investRevenueVendasPrevYear, investRevenueVendasIncPrevYear,
     filtered, filteredTermino, isRange,
@@ -61,6 +61,7 @@ export default function App() {
         allMonths={allMonths}
         currLabel={CURR ? `${CURR.label}${!isRange && CURR.parcial ? ' (parcial)' : ''}` : '—'}
         allFontes={allFontes}
+        fontesInfo={fontesInfo}
         fonteFilter={fonteFilter}
         onFonteFilterChange={setFonteFilter}
       />

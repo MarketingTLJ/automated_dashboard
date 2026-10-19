@@ -14,6 +14,7 @@ export const COLORS = {
   leads:       '#60a5fa',  // leads — soft blue
   leadsEfetivos: '#7c3aed', // leads efetivos — violet-600 (oportunidades reais)
   reunioes:    '#2563eb',  // meetings — blue-600 (variation of leads, darker)
+  oportunidades: '#0891b2', // oportunidades no Closer — cyan-600 (funil de conversão)
   ganho:       '#22c55e',  // won — green
   perdido:     '#E31E24',  // lost — brand red
   aberto:      '#64748b',  // open — slate-500 (neutral, pending state)
@@ -65,6 +66,9 @@ export const FONTES_PAGAS = [
 
 // ── Data source flag (future: 'bitrix24') ──────────────────────────────────────
 export const DATA_SOURCE = 'excel';
+
+// ── Link de um negócio no Bitrix24 (drill-downs com lista de negócios) ─────────
+export const BITRIX_DEAL_URL = id => `https://tljmkt.bitrix24.com.br/crm/deal/details/${id}/`;
 
 // ── ROI target (reference line in charts and alerts) ──────────────────────────
 export const ROI_TARGET = 15;           // x — meta de ROI para linha de referência

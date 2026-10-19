@@ -2,6 +2,16 @@ import { useMemo } from 'react';
 import { DATA, DATA_TERMINO } from '../data/data.js';
 import { FONTES_PAGAS } from '../constants/index.js';
 import { anyInvPendente, monthLabel } from '../utils/months.js';
+import { FUNIL_KEYS, aggFunil } from '../utils/funil.js';
+
+// Every fonte that ever appeared in the data (for the FonteSelector UI)
+const FONTES_HISTORICO = (() => {
+  const s = new Set();
+  [...DATA, ...DATA_TERMINO].forEach(d =>
+    Object.keys(d.por_fonte || {}).forEach(f => { if (f && f !== 'Não identificado') s.add(f); })
+  );
+  return [...s].sort((a, b) => a.localeCompare(b, 'pt-BR'));
+})();
 
 // ── Aggregation helpers ─────────────────────────────────────────────────────
 
@@ -131,6 +141,12 @@ function buildTrend(arr) {
 // monthLabel — ex.: Mai/26 … Out/26 (parcial). Antes eram só meses fechados.
 const LAST6_RAW = DATA.slice(-6);
 
+// Últimos 6 meses FECHADOS (sem o mês em andamento) — comparação dos funis de conversão
+// (decisão do usuário 2026-10-19: aqui o mês parcial fica de fora). Ex.: Abr/26 … Set/26.
+const LAST6_CLOSED_RAW = DATA.filter(d => !d.parcial).slice(-6);
+const LAST6_CLOSED_LABEL = LAST6_CLOSED_RAW.length
+  ? `${LAST6_CLOSED_RAW[0].label} → ${LAST6_CLOSED_RAW.at(-1).label}` : '';
+
 // Same calendar months as LAST6_RAW, one year earlier (e.g. Jan-Jun/26 → Jan-Jun/25).
 // Missing months (no data that far back) are simply omitted.
 const DATA_BY_YM = new Map(DATA.map(d => [d.ym, d]));
@@ -192,6 +208,8 @@ function applyFonteFilter(monthData, expandedFontes) {
   let valor_total_prop = 0, valor_aberto_prop = 0, valor_perdido_prop = 0, valor_ganho_prop = 0;
 
   // Estruturas da aba SDR, mescladas entre as fontes selecionadas
+  // Funil de conversão (null quando o mês não tem funil — dados das planilhas)
+  const funil = monthData.funil ? Object.fromEntries(FUNIL_KEYS.map(k => [k, 0])) : null;
   const sdr_resp    = {};   // { nome: { total, conv_closer, perdido } }
   const sdr_mp_resp = {};   // { nome: { motivo: n } }
   const mp_sdr      = {};   // { motivo: n }
@@ -217,6 +235,7 @@ function applyFonteFilter(monthData, expandedFontes) {
     valor_aberto_prop  += d.valor_aberto_prop  || 0;
     valor_perdido_prop += d.valor_perdido_prop || 0;
     valor_ganho_prop    += d.valor_ganho_prop   || 0;
+    if (funil) FUNIL_KEYS.forEach(k => { funil[k] += d.funil?.[k] || 0; });
 
     Object.entries(d.sdr_resp || {}).forEach(([nome, st]) => {
       if (!sdr_resp[nome]) sdr_resp[nome] = { total: 0, conv_closer: 0, perdido: 0 };
@@ -265,7 +284,9 @@ function applyFonteFilter(monthData, expandedFontes) {
     ganho, perdido, aberto, taxa_fech,
     valor_total_prop, valor_aberto_prop, valor_perdido_prop, valor_ganho_prop,
     ticket, roi, lucro_bruto, cac, cpl, inv,
-    fonte_sdr,
+    fonte_sdr, funil,
+    // Lista dos negócios criados direto no Closer — só os das fontes selecionadas
+    closer_diretos: monthData.closer_diretos?.filter(x => expandedFontes.includes(x.fonte)) ?? null,
   };
 }
 
@@ -412,14 +433,21 @@ export function useDerivedData(criadoStart, criadoEnd, terminoStart, terminoEnd,
     [filteredTermino, expandedFontes]
   );
 
-  // All fontes available in the selected period (for FonteSelector UI)
-  const allFontes = useMemo(() => {
-    const s = new Set();
-    [...filtered, ...filteredTermino].forEach(d =>
-      Object.keys(d.por_fonte || {}).forEach(f => { if (f && f !== 'Não identificado') s.add(f); })
-    );
-    return [...s].sort();
+  // Every fonte in the history + leads (SDR + Closer, by Criado) in the selected period,
+  // for the FonteSelector UI. Fontes with activity in the period come first, by volume.
+  const fontesInfo = useMemo(() => {
+    const noPeriodo = new Set();
+    const leads = {};
+    filtered.forEach(d => Object.entries(d.por_fonte || {}).forEach(([f, v]) => {
+      noPeriodo.add(f);
+      leads[f] = (leads[f] || 0) + (v.leads_sdr || 0) + (v.leads_closer || 0);
+    }));
+    filteredTermino.forEach(d => Object.keys(d.por_fonte || {}).forEach(f => noPeriodo.add(f)));
+    return FONTES_HISTORICO
+      .map(f => ({ fonte: f, leads: leads[f] || 0, noPeriodo: noPeriodo.has(f) }))
+      .sort((a, b) => (b.noPeriodo - a.noPeriodo) || (b.leads - a.leads) || a.fonte.localeCompare(b.fonte, 'pt-BR'));
   }, [filtered, filteredTermino]);
+  const allFontes = FONTES_HISTORICO;
 
   const isRange = filtered.length > 1;
 
@@ -499,6 +527,22 @@ export function useDerivedData(criadoStart, criadoEnd, terminoStart, terminoEnd,
     () => buildInvestRevenue(last6PrevYearF, true), [last6PrevYearF]
   );
 
+  // ── Funil de conversão — últimos 6 meses fechados, honors fonte filter ──
+  const funil6 = useMemo(() => aggFunil(
+    expandedFontes.length
+      ? LAST6_CLOSED_RAW.map(d => applyFonteFilter(d, expandedFontes))
+      : LAST6_CLOSED_RAW,
+    LAST6_CLOSED_LABEL,
+  ), [expandedFontes]);
+
+  // ── Funil do período (filtro "Criado em") — só meses com funil (FUNIL_DESDE em diante) ──
+  const funilPeriodo = useMemo(() => {
+    const com = filteredF.filter(d => d.funil);
+    const label = com.length > 1 ? `${com[0].label} → ${com.at(-1).label}`
+      : com.length ? monthLabel(com[0]) : '';
+    return { ...aggFunil(com, label), mesesForaDoFunil: filteredF.length - com.length };
+  }, [filteredF]);
+
   const taxaGeralCurr = CURR && CURR.leads_total > 0
     ? +((CURR.qtd_v / CURR.leads_total) * 100).toFixed(1) : 0;
   const taxaGeralPrev = PREV && PREV.leads_total > 0
@@ -511,10 +555,10 @@ export function useDerivedData(criadoStart, criadoEnd, terminoStart, terminoEnd,
     filtered: filteredF, filteredTermino: filteredTerminoF,
     CURR, PREV, N, trend,
     // Fixed last-6-months series — ignores date filters (honors fonte filter)
-    trend6, N6, last6: last6F,
+    trend6, N6, last6: last6F, funil6, funilPeriodo,
     investRevenueVendas, investRevenueVendasInc,
     investRevenueVendasPrevYear, investRevenueVendasIncPrevYear,
     taxaGeralCurr, taxaGeralPrev, allMonths, isRange,
-    allFontes,
+    allFontes, fontesInfo,
   };
 }

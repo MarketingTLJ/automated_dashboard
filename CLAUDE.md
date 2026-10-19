@@ -670,7 +670,8 @@ Front (`src/utils/months.js`):
 - `CURR.inv_pendente` = algum mês do período sem investimento → Tab6 mostra "—" /
   "Aguardando investimento" em Total Investido, ROI, Lucro Bruto, CAC, CPL e Leads/R$1k;
   `alertEngine` não dispara alertas de ROI/CPL; gráficos recebem `null` (pulam o ponto).
-- PeriodSelector: rótulo "Out/26 (parcial)", atalhos "Mês em andamento" e "Último mês fechado".
+- PeriodSelector: rótulo "Out/26 (parcial)", atalhos "Mês em andamento" e "Mês anterior" (= último mês
+  fechado; o atalho "Último mês fechado" foi removido em 2026-10-19 por ser redundante).
 - Rodapé: "Dados atualizados em dd/mm/aaaa às hh:mm" (`ATUALIZADO_EM` do data.js).
 
 ### 15.8 Automação diária (`scripts/auto_update.py`)
@@ -786,7 +787,54 @@ O pipeline Eventos tem 88 negócios dessa fonte — 1 não foi copiado para o SD
 
 ---
 
-*Última atualização: Out/2026 | v5.3 — Fonte 'Importação' fora do dashboard (§17); push via GitHub CLI (§15.8)*
+## 18. FUNIL DE CONVERSÃO (abas Funil Comercial e Análise SDR)
+
+> Decisões do usuário em 2026-10-19 — **não alterar sem confirmação**.
+
+- Seção **nova no fim** das duas abas (nada existente foi removido/substituído): dois funis lado a
+  lado — **período do filtro "Criado em"** × **últimos 6 meses FECHADOS** (sem o mês parcial;
+  `LAST6_CLOSED_RAW` no hook). Setas = conversão etapa→etapa; no período, ▲/▼ em p.p. vs 6 meses.
+- Tudo por **safra de criação**; **Vendas = safra** (`ganho`: criados no período que viraram venda),
+  **não** `qtd_v` por Data de Fechamento. Mostra também quantos da safra seguem em aberto.
+- Responde ao filtro de Fonte (`por_fonte[f].funil` somado em `applyFonteFilter`).
+- **Por que precisa do histórico de etapas:** ao marcar "Reunião Realizada" o Bitrix **move o mesmo
+  negócio** do SDR para o Closer — a etapa atual não diz quem agendou. `bitrix_source.fetch_reunioes_sdr`
+  lê `crm.stagehistory.list` (SDR, etapas de `SDR_STAGES_AGENDADA`: Reunião agendada, No-Show,
+  Reagendado, Reunião Realizada, Reunião realizada- Perdido) — ~15 s. Sem histórico (`--source excel`)
+  `funil` = null e o front mostra "Funil disponível apenas com os dados do Bitrix".
+
+| Funil Comercial | Campo | Funil SDR | Campo |
+|---|---|---|---|
+| Leads gerados | `leads_total` | Leads do SDR (ainda no SDR + movidos ao Closer) | `funil.sdr_entrada` |
+| Leads efetivos | `leads_efetivos` | Leads efetivos SDR | `funil.sdr_efetivos` |
+| Reuniões agendadas (SDR que agendou + todo o Closer) | `funil.agendadas` | Reuniões agendadas | `funil.sdr_agendadas` |
+| Oportunidades (negócios no Closer) | `leads_closer` | Reuniões realizadas (passadas ao Closer) | `funil.sdr_realizadas` |
+| Vendas (safra) | `ganho` (+ `aberto`) | Vendas | `funil.sdr_vendas` (+ `sdr_aberto`) |
+
+- **Travas:** etapa de `SDR_STAGES_AGENDADA` sumida, ou etapa nova de reunião no SDR fora do mapa →
+  `SchemaError`. `check_coherence` confere a ordem das etapas e a soma por fonte de cada campo do funil.
+- Referência Set/26: 333 → 212 → 50 → 42 → 5 (21 em aberto) · SDR: 321 → 200 → 38 → 30 → 1.
+- **Só a partir de `FUNIL_DESDE = '2026-01'`** (extract.py, exportado no data.js). Até Jul/25 o time
+  **copiava** o card do SDR para o Closer (o original ficava em 'Reunião Realizada' no SDR); Ago–Dez/25
+  misturou cópia e movimentação; desde Jan/26 o card é **movido**. Com cópia o mesmo lead conta 2x e as
+  etapas não fecham → meses anteriores têm `funil = None`. Período que começa antes: o funil usa só os
+  meses ≥ Jan/26 (`funilPeriodo` no hook) e mostra um aviso laranja; período todo anterior → mensagem.
+- **Diferença Comercial × SDR = negócios criados direto no Closer** (sem SDR: indicação, carteira…).
+  `closer_diretos` (lista por mês, com fonte → filtrável) alimenta a nota "Por que este funil tem números
+  maiores/menores…" no rodapé dos dois funis e a lista "Ver os N negócios criados direto no Closer" (aba
+  Funil Comercial, com link para o Bitrix). Set/26: 12 diretos → 4 vendas · Abr–Set/26: 33 → 6.
+
+## 19. FILTRO DE FONTE — lista completa (2026-10-19)
+
+O seletor lista **todas as fontes do histórico** (`FONTES_HISTORICO` no hook), não só as do período:
+as com dados no período vêm primeiro, ordenadas por leads (SDR + Closer criados no período), e o
+número aparece ao lado. Mostra 12 + "Ver todas as fontes"; pesquisa ignora acento/maiúscula.
+
+---
+
+*Última atualização: Out/2026 | v5.4 — Funil de Conversão nas abas Funil Comercial e Análise SDR (§18); filtro de fonte com todas as fontes + pesquisa (§19)*
+
+*Anterior: v5.3 — Fonte 'Importação' fora do dashboard (§17); push via GitHub CLI (§15.8)*
 
 *Anterior: v5.2 — Eventos: pipeline 127 deixa de ser lido; cópias no SDR contam no mês do evento (§16)*
 

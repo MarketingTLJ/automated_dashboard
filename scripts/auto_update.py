@@ -136,6 +136,16 @@ def check_coherence(new):
                        ('ganho', 'ganho'), ('perdido', 'perdido')):
             if sum(v.get(k, 0) for v in pf.values()) != d[tot]:
                 errs.append(f"{ym}: soma por fonte de {k} ≠ total")
+        # Funil (abas Funil Comercial / Análise SDR): etapas em ordem e soma por fonte = total
+        fn = d.get('funil')
+        if fn:
+            if fn['agendadas'] < d['leads_closer']:
+                errs.append(f"{ym}: funil — reuniões agendadas < oportunidades (Closer)")
+            if fn['sdr_realizadas'] > fn['sdr_agendadas'] or fn['sdr_vendas'] > fn['sdr_realizadas']:
+                errs.append(f"{ym}: funil SDR fora de ordem")
+            for k, v in fn.items():
+                if sum((f.get('funil') or {}).get(k, 0) for f in pf.values()) != v:
+                    errs.append(f"{ym}: soma por fonte do funil {k} ≠ total")
     for d in new['DATA_TERMINO']:
         pf = d.get('por_fonte', {})
         for k in ('qtd_v', 'rec_v', 'qtd_i', 'rec_i'):

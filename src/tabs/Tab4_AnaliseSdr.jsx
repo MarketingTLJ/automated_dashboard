@@ -7,8 +7,11 @@ import { pct } from '../utils/formatters.js';
 import { THR, COLORS, THR_PERDA_SDR } from '../constants/index.js';
 import { MOTIVOS_NAO_EFETIVOS } from '../data/data.js';
 import { sdrRespToArr } from '../utils/respToArray.js';
+import { ConversionFunnel } from '../components/charts/ConversionFunnel.jsx';
+import { etapasSdr, diretosCloser } from '../utils/funil.js';
+import { CloserDiretosNote } from '../components/ui/CloserDiretosNote.jsx';
 
-export function Tab4_AnaliseSdr({ CURR, PREV, filtered, isRange }) {
+export function Tab4_AnaliseSdr({ CURR, PREV, funil6, funilPeriodo, filtered, isRange }) {
   const [sel, setSel] = useState(null);
   if (!CURR) return null;
 
@@ -177,6 +180,24 @@ export function Tab4_AnaliseSdr({ CURR, PREV, filtered, isRange }) {
           <MotifBars motivos={CURR.mp_sdr} color={COLORS.brandRed} />
         </div>
       </div>
+
+      {/* Funil de conversão do SDR — período selecionado × últimos 6 meses fechados */}
+      <ConversionFunnel
+        titulo="Funil de Conversão — SDR"
+        etapasPeriodo={etapasSdr(funilPeriodo)}
+        etapasSeis={etapasSdr(funil6)}
+        labelPeriodo={funilPeriodo.label}
+        labelSeis={funil6.label}
+        mesesForaDoFunil={funilPeriodo.mesesForaDoFunil}
+      >
+        <CloserDiretosNote
+          variant="sdr"
+          periodo={diretosCloser(funilPeriodo)}
+          seis={diretosCloser(funil6)}
+          labelPeriodo={funilPeriodo.label}
+          lista={funilPeriodo.closer_diretos}
+        />
+      </ConversionFunnel>
     </div>
   );
 }

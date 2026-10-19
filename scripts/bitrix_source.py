@@ -41,6 +41,19 @@ SELECT = ['ID', 'TITLE', 'STAGE_ID', 'DATE_CREATE', 'CLOSEDATE', 'MOVED_TIME', '
           'SOURCE_ID', 'ASSIGNED_BY_ID', 'COMPANY_ID',
           UF_MOTIVO_SDR, UF_TLJ_SDR, UF_RENOVACAO, UF_LC_VENC, UF_LC_MOTIVO, UF_LC_BITRIX]
 
+# Etapas do SDR que significam "reunião agendada" (funil das abas Funil Comercial e
+# Análise SDR, decisão do usuário 2026-10-19). Ao marcar 'Reunião Realizada' (WON) o
+# Bitrix MOVE o negócio para o pipeline Closer — por isso só o histórico de etapas
+# (crm.stagehistory.list) diz quem chegou a agendar. Chave = STATUS_ID (estável em renomeações).
+SDR_STAGES_AGENDADA = {
+    'PREPARATION': 'Reunião agendada',
+    'UC_C0AX1E':   'No-Show',
+    'UC_V7Y1YA':   'Reagendado',
+    'WON':         'Reunião Realizada',
+    'UC_5CLVZR':   'Reunião realizada- Perdido',
+}
+SDR_STAGES_REALIZADA = {'WON', 'UC_5CLVZR'}
+
 _READ_ONLY_SUFFIXES = ('.list', '.get', '.fields')
 
 
@@ -113,6 +126,32 @@ def fetch_stages(category_id: int) -> list[dict]:
     return [{'STATUS_ID': s['STATUS_ID'], 'NAME': s['NAME'],
              'SEMANTICS': (s.get('EXTRA') or {}).get('SEMANTICS') or 'process'}
             for s in _result('crm.status.list', {'filter': {'ENTITY_ID': ent}})]
+
+
+def fetch_reunioes_sdr() -> dict:
+    """
+    IDs de negócios que passaram por uma etapa de reunião no SDR (histórico de etapas):
+      {'agendada': {ids que chegaram a agendar}, 'realizada': {ids com reunião realizada}}
+    Vale também para os negócios que hoje estão no Closer (foram movidos do SDR).
+    """
+    items, last = [], 0
+    while True:
+        r = call('crm.stagehistory.list', {
+            'entityTypeId': 2, 'order': {'ID': 'ASC'}, 'start': -1,
+            'filter': {'CATEGORY_ID': CAT_SDR, 'STAGE_ID': list(SDR_STAGES_AGENDADA), '>ID': last},
+            'select': ['ID', 'OWNER_ID', 'STAGE_ID'],
+        })
+        if 'result' not in r:
+            raise BitrixError(f"crm.stagehistory.list: {r.get('error')} — {r.get('error_description')}")
+        page = r['result'].get('items', [])
+        items += page
+        if len(page) < 50:
+            break
+        last = int(page[-1]['ID'])
+    return {
+        'agendada':  {int(x['OWNER_ID']) for x in items},
+        'realizada': {int(x['OWNER_ID']) for x in items if x['STAGE_ID'] in SDR_STAGES_REALIZADA},
+    }
 
 
 def fetch_companies(ids) -> dict:
@@ -201,7 +240,8 @@ def load_raw_frames(log=print) -> dict:
     """
     Baixa tudo do Bitrix e devolve:
       {'sdr','closer','rent','lics': DataFrame, 'stages': {cat: [...]},
-       'enums': {...}, 'sources': {nomes}, 'users_missing': [...], 'counts': {...}}
+       'enums': {...}, 'sources': {nomes}, 'users_missing': [...], 'counts': {...},
+       'reunioes': {'agendada': {ids}, 'realizada': {ids}}}
     """
     t0 = time.time()
     fields = _result('crm.deal.fields')
@@ -221,6 +261,7 @@ def load_raw_frames(log=print) -> dict:
         'rent':   fetch_deals({'CATEGORY_ID': CAT_RENT}),
         'lics':   fetch_deals({'CATEGORY_ID': CAT_LC}),
     }
+    reunioes  = fetch_reunioes_sdr()
     companies = fetch_companies(r.get('COMPANY_ID') for rows in raw.values() for r in rows)
     users, users_missing = resolve_users(
         r.get(k) for rows in raw.values() for r in rows for k in ('ASSIGNED_BY_ID', UF_TLJ_SDR))
@@ -230,4 +271,4 @@ def load_raw_frames(log=print) -> dict:
     counts = {k: len(v) for k, v in frames.items()}
     log(f"  Bitrix: {counts} · {len(companies)} empresas · {time.time() - t0:.0f}s")
     return {**frames, 'stages': stages_by_cat, 'enums': enums, 'sources': set(sources.values()),
-            'users_missing': users_missing, 'counts': counts}
+            'users_missing': users_missing, 'counts': counts, 'reunioes': reunioes}

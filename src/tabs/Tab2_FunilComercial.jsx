@@ -1,6 +1,9 @@
 ﻿import { SectionHeader } from '../components/ui/SectionHeader.jsx';
 import { FunnelBars } from '../components/charts/FunnelBars.jsx';
 import { WinLossBar } from '../components/charts/WinLossBar.jsx';
+import { ConversionFunnel } from '../components/charts/ConversionFunnel.jsx';
+import { etapasComercial, diretosCloser } from '../utils/funil.js';
+import { CloserDiretosNote } from '../components/ui/CloserDiretosNote.jsx';
 import { DeltaBadge } from '../components/ui/DeltaBadge.jsx';
 import { fmt, scl, sclCls, pct } from '../utils/formatters.js';
 import { THR, COLORS } from '../constants/index.js';
@@ -22,7 +25,7 @@ const VALUE_CARDS = [
   { key: 'rec_v',              label: 'Valor Ganho',           color: COLORS.ganho,           icon: '💰', note: 'Vendas fechadas · Data de Fechamento' },
 ];
 
-export function Tab2_FunilComercial({ CURR, PREV, trend6, N6, filtered, isRange }) {
+export function Tab2_FunilComercial({ CURR, PREV, trend6, N6, funil6, funilPeriodo, filtered, isRange }) {
   if (!CURR) return null;
 
   const taxaGeral = CURR.leads_total > 0 ? +((CURR.qtd_v / CURR.leads_total) * 100).toFixed(1) : 0;
@@ -131,6 +134,24 @@ export function Tab2_FunilComercial({ CURR, PREV, trend6, N6, filtered, isRange 
           <WinLossBar data={trend6} N={N6} />
         </div>
       </div>
+
+      {/* Funil de conversão — período selecionado × últimos 6 meses fechados */}
+      <ConversionFunnel
+        titulo="Funil de Conversão — Comercial"
+        etapasPeriodo={etapasComercial(funilPeriodo)}
+        etapasSeis={etapasComercial(funil6)}
+        labelPeriodo={funilPeriodo.label}
+        labelSeis={funil6.label}
+        mesesForaDoFunil={funilPeriodo.mesesForaDoFunil}
+      >
+        <CloserDiretosNote
+          variant="comercial"
+          periodo={diretosCloser(funilPeriodo)}
+          seis={diretosCloser(funil6)}
+          labelPeriodo={funilPeriodo.label}
+          lista={funilPeriodo.closer_diretos}
+        />
+      </ConversionFunnel>
     </div>
   );
 }

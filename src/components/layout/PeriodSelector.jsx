@@ -33,7 +33,10 @@ function fmtLabel(ym) {
   return isPartial(ym) ? `${label} (parcial)` : label;
 }
 
-// Atalhos contam a partir do último mês FECHADO; o mês em andamento tem atalho próprio
+// Atalhos contam a partir do último mês FECHADO; o mês em andamento tem atalho próprio.
+// "Mês anterior" = último mês fechado (o antigo atalho "Último mês fechado" era redundante —
+// removido a pedido do usuário em 2026-10-19; antes "Mês anterior" voltava 2 meses).
+// "Último trimestre" também saiu (pegava 4 meses; "Últimos 3 meses" já cobre).
 function getPresets() {
   const last = LAST_CLOSED;
   const get  = (n) => CLOSED_YMS.at(-n) ?? CLOSED_YMS[0] ?? last;
@@ -43,11 +46,9 @@ function getPresets() {
   const yPrv = CLOSED_YMS.filter(ym => ym.startsWith(prvY));
   return [
     ...(PARTIAL_YM ? [{ label: 'Mês em andamento',  start: PARTIAL_YM, end: PARTIAL_YM }] : []),
-    { label: 'Último mês fechado',  start: last,                  end: last },
-    { label: 'Mês anterior',        start: get(2),                end: get(2) },
+    { label: 'Mês anterior',        start: last,                  end: last },
     { label: 'Últimos 3 meses',     start: get(3),                end: last },
     { label: 'Últimos 6 meses',     start: get(6),                end: last },
-    { label: 'Último trimestre',    start: get(4),                end: last },
     { label: 'Últimos 12 meses',   start: get(12),               end: last },
     { label: `Ano atual (${curY})`,     start: yCur[0] ?? last,       end: last },
     { label: `Ano anterior (${prvY})`,  start: yPrv[0] ?? ALL_YMS[0], end: yPrv.at(-1) ?? last },

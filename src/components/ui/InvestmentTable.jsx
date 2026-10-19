@@ -1,8 +1,7 @@
 import { useState, Fragment } from 'react';
 import { fmt, pct, sclCls } from '../../utils/formatters.js';
 import { monthLabel } from '../../utils/months.js';
-
-const BITRIX_DEAL_URL = id => `https://tljmkt.bitrix24.com.br/crm/deal/details/${id}/`;
+import { BITRIX_DEAL_URL } from '../../constants/index.js';
 
 export function InvestmentTable({ last6 }) {
   const [selMonth, setSelMonth] = useState(null);
