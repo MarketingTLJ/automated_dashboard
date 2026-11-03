@@ -27,6 +27,16 @@ export const COLORS = {
   lcCancelado: '#e11d48',  // rose-600 — churn / cancelado
   lcAberto:    '#64748b',  // slate-500 — em aberto / pendente
 
+  // Cockpit AI (aba 8) — origem dos leads e grupo da etapa no Kanban do Cockpit
+  ckConta:     '#3374B5',  // cadastro na conta gratuita (cockpitai.net.br/comecar)
+  ckWhatsApp:  '#10b981',  // WhatsApp / chatbot / anúncio de WhatsApp
+  ckOutras:    '#94a3b8',  // demais origens / não informada
+  ckNovo:      '#93c5fd',  // cadastro no Bitrix ainda não exportado do Cockpit
+  ckAndamento: '#64748b',  // em tratativa, conexão feita, sem resposta…
+  ckAvancado:  '#7c3aed',  // DEMO usando, em proposta, aguardando pagamento
+  ckGanho:     '#22c55e',
+  ckPerdido:   '#E31E24',
+
   // UI states
   success: '#22c55e',
   warning: '#f97316',  // orange-500 (replaces amber)
@@ -54,7 +64,16 @@ export const TABS = [
   { id: 5, label: 'Prop. Perdidas',   short: 'Perdidas'  },
   { id: 6, label: 'Investimentos',    short: 'Invest.'   },
   { id: 7, label: 'Licenças CS',      short: 'Licenças'  },
+  { id: 8, label: 'Cockpit AI',       short: 'Cockpit'   },
 ];
+
+// ── Cockpit AI (aba 8, CLAUDE.md §20) ─────────────────────────────────────────
+// Etapas do Kanban do Cockpit que contam como "negociação avançada" (o lead já está
+// usando a demo ou recebeu proposta). Ganho/perda vêm do data.js (COCKPIT.etapa_*).
+export const COCKPIT_ETAPAS_AVANCADAS = ['DEMO Usando', 'Em proposta', 'Aguardando pagamento'];
+// Origem (coluna "Origem" da planilha do Cockpit) → grupo do gráfico diário
+export const COCKPIT_ORIGEM_CONTA    = 'Conta gratuita do CRM';
+export const COCKPIT_ORIGENS_WHATSAPP = ['WhatsApp', 'WhatsApp (chatbot)', 'Anúncio (WhatsApp)'];
 
 // ── Fontes consideradas pagas (origem: Reports/FontesPagas.xlsx) ──────────────
 // Sincronizar com extract.py ao atualizar FontesPagas.xlsx

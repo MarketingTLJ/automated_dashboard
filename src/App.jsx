@@ -12,6 +12,7 @@ import { Tab4_AnaliseSdr }         from './tabs/Tab4_AnaliseSdr.jsx';
 import { Tab5_PropostasPerdidas }  from './tabs/Tab5_PropostasPerdidas.jsx';
 import { Tab6_Investimentos }      from './tabs/Tab6_Investimentos.jsx';
 import { Tab7_Licencas }           from './tabs/Tab7_Licencas.jsx';
+import { Tab8_CockpitAI }          from './tabs/Tab8_CockpitAI.jsx';
 
 // Abre com "Criado em" e "Data de Término" no MÊS ATUAL (em andamento, "parcial") —
 // decisão do usuário em 2026-10-19. Sem mês em andamento, cai no último mês disponível.
@@ -80,6 +81,8 @@ export default function App() {
         {activeTab === 5 && <Tab5_PropostasPerdidas {...tabProps} />}
         {activeTab === 6 && <Tab6_Investimentos {...tabProps} />}
         {activeTab === 7 && <Tab7_Licencas {...tabProps} />}
+        {/* Cockpit AI usa só o filtro "Criado em" (dados próprios em COCKPIT, não em DATA) — §20 */}
+        {activeTab === 8 && <Tab8_CockpitAI periodStart={criadoStart} periodEnd={criadoEnd} />}
       </div>
 
       <Footer

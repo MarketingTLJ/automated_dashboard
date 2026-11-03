@@ -5,7 +5,8 @@ import { EventoNote } from '../components/ui/EventoNote.jsx';
 import { getEventNotes } from '../utils/eventos.js';
 import { RoiCplComposed } from '../components/charts/RoiCplComposed.jsx';
 import { RevenueInvestmentTrend } from '../components/charts/RevenueInvestmentTrend.jsx';
-import { fmt, fmtK } from '../utils/formatters.js';
+import { fmt, fmtK, fmtCents } from '../utils/formatters.js';
+import { verbaCockpitForaDoGrupo } from '../utils/cockpit.js';
 import { COLORS } from '../constants/index.js';
 
 export function Tab6_Investimentos({
@@ -27,6 +28,19 @@ export function Tab6_Investimentos({
 
       {/* Comentário de evento (verba destinada ao evento no mês) — CLAUDE.md §16 */}
       <EventoNote notes={getEventNotes(filtered, filteredTermino)} />
+
+      {/* Verba do Cockpit fora do Grupo desde Out/26 — aparece na aba Cockpit AI (§20) */}
+      {verbaCockpitForaDoGrupo(filtered, filteredTermino).map(v => (
+        <div key={v.ym} className="flex items-start gap-3 p-4 mb-5 rounded-xl border bg-brand-blue/5 border-brand-blue/20 text-xs leading-relaxed text-gray-700">
+          <span className="text-base flex-shrink-0 mt-0.5">🧭</span>
+          <p>
+            <strong className="text-brand-blue">{v.label} · Cockpit AI fora do Grupo.</strong>{' '}
+            Os <strong>{fmtCents(v.valor)}</strong> investidos no Cockpit CRM neste mês não entram no Total Investido,
+            ROI, CAC e CPL do Grupo, porque os leads da conta gratuita não estão nos leads do Grupo.
+            Esse investimento e os resultados dele estão na aba <strong>Cockpit AI</strong>.
+          </p>
+        </div>
+      ))}
 
       {/* KPIs — row 1 */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-4">

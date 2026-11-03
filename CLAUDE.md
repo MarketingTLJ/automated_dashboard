@@ -29,6 +29,7 @@ automated-reports/
 │   ├── extract.py         ← ÚNICA fonte de data.js — nunca editar data.js à mão (--source bitrix|excel)
 │   ├── bitrix_source.py   ← lê os 4 pipelines do Bitrix24 (somente leitura) — §15
 │   ├── bitrix_users.json  ← ID do Bitrix → nome da pessoa (§15.4)
+│   ├── cockpit_source.py  ← aba Cockpit AI: planilha do Cockpit CRM × Bitrix pipeline Marketing (§20)
 │   ├── auto_update.py     ← rotina diária: extrai → trava → build → commit/push → deploy
 │   ├── registrar_agendamento.ps1 ← cria a tarefa das 06:00 no Agendador do Windows
 │   ├── inspect_excel.py   ← diagnóstico de estrutura dos arquivos Excel
@@ -42,13 +43,14 @@ automated-reports/
 │   │   ├── months.js      ← LAST_CLOSED, PARTIAL_YM, anyInvPendente (mês em andamento — §15.7)
 │   │   ├── formatters.js  ← fmt, fmtK, pct, dp, scl, sclCls
 │   │   ├── alertEngine.js ← geração de alertas diagnósticos
+│   │   ├── cockpit.js     ← agregações da aba Cockpit AI (§20)
 │   │   └── respToArray.js ← closerRespToArr, sdrRespToArr (transforma objetos em arrays)
 │   ├── components/
 │   │   ├── ui/            ← KpiCard, DeltaBadge, MotifBars, StatusBadge, AlertBanner, ChartTooltip, SectionHeader
 │   │   ├── layout/        ← Header, PeriodSelector, Footer
 │   │   └── charts/        ← RevenueStackedBar, ConversionRateBar, FunnelBars, WinLossBar, RoiCplComposed
-│   └── tabs/              ← Tab0_ResumoExecutivo … Tab6_Investimentos
-└── Reports/               ← INVESTIMENTOS.xlsx, FontesPagas.xlsx (+ exportações antigas, backup) — não versionados
+│   └── tabs/              ← Tab0_ResumoExecutivo … Tab7_Licencas, Tab8_CockpitAI
+└── Reports/               ← INVESTIMENTOS.xlsx, FontesPagas.xlsx, negocios-vendas-*.xlsx (Cockpit) (+ exportações antigas, backup) — não versionados
 ```
 
 ---
@@ -144,7 +146,9 @@ Arquivo: `INVESTIMENTOS.xlsx`
 - **Última linha** = `Total Investido Mês` (fórmula `=SUM` das linhas acima — linha nova de canal
   tem de ficar ACIMA dela e dentro da soma). As demais linhas viram o "Investimento por Canal".
 - Colunas: `'jan/25', 'fev/25', ...` (cabeçalho `mmm/aa` minúsculo)
-- Linha `Outros` (desde Set/26) = verba de eventos (§16)
+- Linha `CockpitAI` (era `Outros`; renomeada pelo usuário em 2026-11-03) = verba do Cockpit AI:
+  Set/26 = Live de lançamento (§16, continua no Grupo); **a partir de Out/26 sai do Total Investido
+  do Grupo** e vai só para a aba Cockpit AI (§20). Renomear a linha → `SchemaError` (não publica).
 
 ---
 
@@ -198,6 +202,9 @@ de segurança → `npm run build` → commit **só do data.js** → push → Dep
     (cabeçalho 'mmm/aa' minúsculo, ex: 'out/26'; mesmo formato das colunas anteriores).
     A próxima execução das 06:00 publica sozinha. Até lá, o mês aparece como
     "Aguardando investimento" (ROI/CAC/CPL/Lucro) — não como ROI 0x.
+[ ] Cockpit AI (§20): exportar do Cockpit CRM o pipeline Vendas (Exportar → Excel) e salvar em
+    Reports/ com o nome padrão 'negocios-vendas-AAAA-MM-DD.xlsx' (vale a mais recente).
+    Etapas/valores da aba ficam na posição da última planilha; datas e UTMs atualizam todo dia.
 [ ] Se uma fonte paga mudar: editar Reports/FontesPagas.xlsx e sincronizar FONTES_PAGAS
     em src/constants/index.js (§12)
 ```
@@ -749,7 +756,7 @@ Front (`src/utils/months.js`):
 ### Eventos cadastrados
 | Mês | Evento | Fonte | Linha de investimento | Cópias no SDR | Referência (06/10/2026) |
 |---|---|---|---|---|---|
-| Set/26 | Lançamento do Cockpit AI (Live 28/09) | Cockpit Website | `Outros` (R$ 2.886,89) | 87 em 05/10/2026 | 84 em andamento + 3 perdidos |
+| Set/26 | Lançamento do Cockpit AI (Live 28/09) | Cockpit Website | `CockpitAI` (ex-`Outros`, R$ 2.886,89) | 87 em 05/10/2026 | 84 em andamento + 3 perdidos |
 
 Set/26 com o evento: 291 SDR (204 + 87 cópias) + 42 Closer = **333 leads** · 228 efetivos · CPL R$ 37,89.
 O pipeline Eventos tem 88 negócios dessa fonte — 1 não foi copiado para o SDR e fica fora.
@@ -832,9 +839,62 @@ O seletor lista **todas as fontes do histórico** (`FONTES_HISTORICO` no hook), 
 as com dados no período vêm primeiro, ordenadas por leads (SDR + Closer criados no período), e o
 número aparece ao lado. Mostra 12 + "Ver todas as fontes"; pesquisa ignora acento/maiúscula.
 
+## 20. ABA COCKPIT AI (Cockpit CRM — 2ª frente do Grupo)
+
+> Decisões do usuário em 2026-11-03 — **não alterar sem confirmação**.
+
+O Cockpit CRM é o software CRM próprio do grupo (conta gratuita em `cockpitai.net.br/comecar`,
+planos por mensalidade). Aba 8 (`Tab8_CockpitAI.jsx`), lógica em `utils/cockpit.js`, dados em
+`COCKPIT` do data.js, gerados por `scripts/cockpit_source.py` (chamado no fim de `extract.main`).
+
+**Fontes (cruzadas negócio a negócio — PROCV):**
+1. **Planilha do Cockpit** `Reports/negocios-vendas-AAAA-MM-DD.xlsx` (pipeline Vendas, exportada à mão;
+   vale a mais recente pelo nome). É a **base completa**: Título, Cliente, Etapa, Valor, Responsável,
+   Origem, Criado em, Última movimentação. "Posição" da aba = maior Última movimentação.
+2. **Bitrix pipeline Marketing (65)**: todo cadastro da conta gratuita tem `SOURCE_DESCRIPTION` começando
+   com "Conta gratuita do CRM" (hoje nas etapas CRM EXTERNO / Em contato (Leticia), mas o filtro é pela
+   fonte, em qualquer etapa). Traz a **data real** e as **UTMs** (`UTM_*`). O Cockpit importou em
+   22/10 17:33 os cadastros de 20–21/10 → data do Cockpit errada para eles; vale a do Bitrix.
+
+**Cruzamento** (`_casar`): título (parte depois de "Conta gratuita do CRM ·") + nome do contato →
+só título → só nome (estes dois com data ±3 dias; o time renomeia cards no Cockpit). Ref. 03/11/2026:
+257 negócios · 242 cadastros Bitrix · 225 casados · 3 cadastros após a exportação (entram como etapa
+"Ainda não na planilha") · 8 do Bitrix sem par (ficam fora, listados no log).
+
+**Regras:**
+- **Testes fora**: título/nome com "teste"/"apagar", código no nome (`<script`), ou nome completo
+  **exato** de alguém do time (`bitrix_users.json` + `EQUIPE_EXTRA` + responsáveis do Cockpit).
+  Só nome exato: "Carlos Maxwell Silva" é cliente real. Lista sai no log a cada execução. Ref.: 13 testes.
+  Exceções confirmadas pelo usuário (cadastro real que a regra pegaria) → `NAO_TESTE_BITRIX_IDS`
+  (ID do negócio no Bitrix): #155257 "Pessoa física", cliente homônimo de Michael Silva.
+  Suzana Dias Chagas **não** é do time (cadastro "Marketing" é real; hoje está sem par no Cockpit).
+- **Valor = mensalidade (MRR)**. KPIs: Mensalidade conquistada, Payback = inv ÷ MRR (meses),
+  ROI no 1º mês = (MRR − inv) ÷ inv, CAC = inv ÷ vendas.
+- **Sem "leads efetivos"** nesta aba.
+- Só o filtro **Criado em** (safra). Etapas: Fechado = ganho, Perdido = perda, DEMO Usando / Em proposta /
+  Aguardando pagamento = "negociação avançada" (`COCKPIT_ETAPAS_AVANCADAS`), resto = em andamento.
+  Etapa nova no Cockpit → AVISO no log (não trava).
+- **Investimento** = linha `CockpitAI` de INVESTIMENTOS.xlsx, desde `COCKPIT_DESDE = '2026-10'`. Nesses
+  meses a linha **sai do Total Investido/ROI/CAC/CPL do Grupo** (`_cockpit_fora` em extract.py) e a aba
+  Investimentos mostra a faixa "🧭 Cockpit AI fora do Grupo". Set/26 (Live) segue no Grupo e aparece na
+  aba Cockpit como **bloco separado** (via `EVENTOS`, leads da fonte Cockpit Website no SDR).
+- Privacidade: o data.js (repo público) leva só etapa, data, origem, responsável, valor, segmento e UTMs —
+  **nunca o nome do cliente**.
+- Sem planilha / formato mudou → `COCKPIT = null` + AVISO; o resto do dashboard publica normalmente.
+
+**Conteúdo da aba:** KPIs (leads, investimento, CPL, custo por conta gratuita, vendas, MRR, payback,
+perdidos) · etapa atual (Kanban) + conversão da safra · leads por dia por origem · origem · UTMs
+(campanha / público=utm_content / anúncio=utm_term / plataforma / posicionamento) · por responsável ·
+segmento do cadastro + interesse na IA Mira · Live Set/26 · nota de como a aba é montada.
+
+Ref. Out/26 (antes das exceções de teste): 216 leads (188 contas gratuitas) · R$ 2.336,29 · CPL R$ 10,82 · 1 venda (R$ 700/mês) ·
+42 perdidos · 17 chegaram a demo/proposta. Grupo Out/26: inv R$ 7.777,46 (sem o Cockpit).
+
 ---
 
-*Última atualização: Out/2026 | v5.4 — Funil de Conversão nas abas Funil Comercial e Análise SDR (§18); filtro de fonte com todas as fontes + pesquisa (§19)*
+*Última atualização: Nov/2026 | v5.5 — Aba Cockpit AI (§20); verba do Cockpit fora do Grupo desde Out/26; linha 'Outros' → 'CockpitAI'*
+
+*Anterior: v5.4 — Funil de Conversão nas abas Funil Comercial e Análise SDR (§18); filtro de fonte com todas as fontes + pesquisa (§19)*
 
 *Anterior: v5.3 — Fonte 'Importação' fora do dashboard (§17); push via GitHub CLI (§15.8)*
 

@@ -73,11 +73,19 @@ MOTIVOS_NAO_EFETIVOS = {
 # O pipeline "Eventos & Inscritos" (127) NÃO é lido — evita contar o lead duas vezes.
 # Novo evento → acrescentar um item aqui (e a fonte em FontesPagas.xlsx se for paga).
 EVENTOS = [
+    # A linha 'Outros' de INVESTIMENTOS.xlsx foi renomeada para 'CockpitAI' em 2026-11-03
     {'ym': '2026-09', 'nome': 'Lançamento do Cockpit AI (Live 28/09)',
-     'fonte': 'Cockpit Website', 'canal_investimento': 'Outros',
+     'fonte': 'Cockpit Website', 'canal_investimento': 'CockpitAI',
      'copiado_sdr_em': '2026-10-05'},
 ]
 EVENTOS_FONTES = {e['fonte'] for e in EVENTOS}
+
+# Cockpit AI (CLAUDE.md §20) — 2ª frente do grupo, aba própria. Decisão do usuário (2026-11-03):
+# a verba da linha CANAL_COCKPIT sai do investimento do GRUPO a partir de COCKPIT_DESDE (os leads
+# da conta gratuita ficam no pipeline Marketing, fora dos leads do Grupo) e passa a aparecer só
+# na aba Cockpit. Set/26 (Live, leads no SDR) continua no Grupo.
+CANAL_COCKPIT = 'CockpitAI'
+COCKPIT_DESDE = '2026-10'
 
 # Fontes que ficam FORA do dashboard (CLAUDE.md §17). Decisão do usuário (2026-10-19):
 # 'Importação' = listas importadas em massa no pipeline SDR (400 em 16/10/2026,
@@ -146,31 +154,45 @@ def load_fontes_pagas() -> set:
         return set()
 
 
+def _num(v):
+    try:
+        v = float(v)
+        return v if pd.notna(v) else None
+    except (ValueError, TypeError):
+        return None
+
+
+def _cockpit_fora(ym: str, canal: str) -> bool:
+    """Verba do Cockpit a partir de COCKPIT_DESDE não entra no investimento do Grupo (§20)."""
+    return canal == CANAL_COCKPIT and ym >= COCKPIT_DESDE
+
+
 def load_investments() -> dict:
-    """Returns {ym: total_float} from INVESTIMENTOS.xlsx row 'Total Investido Mês'"""
+    """Returns {ym: total_float} from INVESTIMENTOS.xlsx row 'Total Investido Mês'
+    (menos a linha do Cockpit a partir de COCKPIT_DESDE — §20)"""
     df = pd.read_excel(FILE_INV)
     # Last row = Total Investido Mês
     total_row = df.iloc[-1]
+    channels = [str(c).strip() for c in df['Source'].tolist()[:-1]]
     inv_map = {}
     for col in df.columns:
         if col == 'Source':
             continue
         ym = _ym(str(col))
         if ym and '?' not in ym:
-            try:
-                val = float(total_row[col])
-                if pd.notna(val):
-                    inv_map[ym] = round(val, 2)
-            except (ValueError, TypeError):
-                pass
+            val = _num(total_row[col])
+            if val is not None:
+                fora = sum(_num(df.iloc[i][col]) or 0.0
+                           for i, ch in enumerate(channels) if _cockpit_fora(ym, ch))
+                inv_map[ym] = round(val - fora, 2)
     return inv_map
 
 
 def load_inv_breakdown() -> dict:
-    """Returns {ym: {source_name: float}} for channel breakdown charts"""
+    """Returns {ym: {source_name: float}} for channel breakdown charts (sem o Cockpit desde COCKPIT_DESDE)"""
     df = pd.read_excel(FILE_INV)
     result = {}
-    channels = df['Source'].tolist()[:-1]  # exclude Total row
+    channels = [str(c).strip() for c in df['Source'].tolist()[:-1]]  # exclude Total row
     for col in df.columns:
         if col == 'Source':
             continue
@@ -179,15 +201,31 @@ def load_inv_breakdown() -> dict:
             continue
         breakdown = {}
         for i, ch in enumerate(channels):
-            try:
-                val = float(df.iloc[i][col])
-                if pd.notna(val) and val > 0:
-                    breakdown[str(ch)] = round(val, 2)
-            except (ValueError, TypeError):
-                pass
+            val = _num(df.iloc[i][col])
+            if val is not None and val > 0 and not _cockpit_fora(ym, ch):
+                breakdown[ch] = round(val, 2)
         if breakdown:
             result[ym] = breakdown
     return result
+
+
+def load_inv_canal(canal: str) -> dict:
+    """{ym: valor} de UMA linha de INVESTIMENTOS.xlsx. Linha inexistente → SchemaError
+    (renomear a linha zeraria a verba sem erro — aconteceu com 'Outros' → 'CockpitAI')."""
+    df = pd.read_excel(FILE_INV)
+    channels = [str(c).strip() for c in df['Source'].tolist()[:-1]]
+    if canal not in channels:
+        raise SchemaError(f"Linha '{canal}' não existe em INVESTIMENTOS.xlsx (linhas: {channels}) — "
+                          f"foi renomeada? Ajustar CANAL_COCKPIT / EVENTOS em extract.py")
+    i = channels.index(canal)
+    out = {}
+    for col in df.columns:
+        ym = _ym(str(col)) if col != 'Source' else ''
+        if ym and '?' not in ym:
+            val = _num(df.iloc[i][col])
+            if val:
+                out[ym] = round(val, 2)
+    return out
 
 
 def _vlookup_fonte(df, closer, label=''):
@@ -1028,7 +1066,11 @@ def main(source='bitrix', output=None):
     print("Loading investment data...")
     inv_map       = load_investments()
     inv_breakdown = load_inv_breakdown()
+    inv_cockpit   = load_inv_canal(CANAL_COCKPIT)          # trava: linha tem de existir
+    for e in EVENTOS:
+        load_inv_canal(e['canal_investimento'])             # idem para a verba de cada evento
     print(f"  Found investments for {len(inv_map)} months: {sorted(inv_map.keys())}")
+    print(f"  Cockpit ('{CANAL_COCKPIT}'): {inv_cockpit} — fora do Grupo a partir de {COCKPIT_DESDE}")
 
     print("Loading CRM data...")
     sdr, closer, rent, lics = load_dataframes_bitrix() if source == 'bitrix' else load_dataframes_excel()
@@ -1105,6 +1147,20 @@ def main(source='bitrix', output=None):
               f"| rec_v=R${got['rec_v']:,.0f} (exp:R${exp['rec_v']:,.0f}) "
               f"| roi={got['roi']}x (exp:{exp['roi']}x)")
 
+    # Cockpit AI (§20): planilha do Cockpit CRM + cadastros da conta gratuita no Bitrix.
+    # Problema só da planilha do Cockpit não trava o resto do dashboard — vira AVISO e a aba explica.
+    print("\nBuilding COCKPIT (planilha do Cockpit CRM × Bitrix pipeline Marketing)...")
+    import cockpit_source
+    try:
+        cockpit = cockpit_source.build(inv_cockpit, COCKPIT_DESDE, com_bitrix=(source == 'bitrix'))
+    except cockpit_source.CockpitError as e:
+        cockpit = None
+        RUN_INFO['warnings'].append(f"Aba Cockpit sem dados: {e}")
+    if cockpit:
+        cockpit['canal'] = CANAL_COCKPIT   # o front liga a Live (EVENTOS) à aba por esta linha
+    if cockpit and cockpit['etapas_novas']:
+        RUN_INFO['warnings'].append(f"Cockpit: etapas novas {cockpit['etapas_novas']} — conferir (§20)")
+
     for w in RUN_INFO['warnings']:
         print(f"  AVISO: {w}")
 
@@ -1126,6 +1182,10 @@ def main(source='bitrix', output=None):
         f"export const EVENTOS = {json.dumps(EVENTOS, ensure_ascii=False)};\n\n"
         f"// Primeiro mês com funil de conversão (antes o card era copiado do SDR para o Closer) — §18\n"
         f"export const FUNIL_DESDE = {json.dumps(FUNIL_DESDE)};\n\n"
+        f"// Aba Cockpit AI (§20): um item por negócio, sem nome de cliente. Chaves: d=criado, e=etapa,\n"
+        f"// o=origem, r=responsável, v=mensalidade, c=criou conta gratuita, s=segmento, mira=interesse na IA Mira,\n"
+        f"// u=UTMs (plat, pos=posicionamento, camp=campanha, pub=público/conjunto, anun=anúncio)\n"
+        f"export const COCKPIT = {json.dumps(cockpit, ensure_ascii=False)};\n\n"
         f"// Momento da extração (horário de São Paulo) e origem dos dados do CRM\n"
         f"export const ATUALIZADO_EM = {json.dumps(atualizado_em)};\n"
         f"export const FONTE_DADOS = {json.dumps(source)};\n"
